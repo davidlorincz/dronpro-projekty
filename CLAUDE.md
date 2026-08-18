@@ -30,6 +30,7 @@ Next.js 16 App Router · React 19 · TypeScript · Convex 1.40 · Clerk v7 (Goog
 
 ## Provoz
 - `npm run dev` (Next + `convex dev`), `npm run typecheck`, `npm run lint`, `npm run build`
+- Deploy: push do `main` → Vercel build = `npx convex deploy --cmd 'npm run build'` (CONVEX_DEPLOY_KEY v Vercelu) → Convex prod + Next najednou. Prod URL https://dronpro-projekty.vercel.app
 - Convex env: `CLERK_JWT_ISSUER_DOMAIN`, `INITIAL_ADMIN_EMAILS` (čárkou oddělené e-maily, které jsou vždy admin), `APP_URL`, `RESEND_API_KEY` (klíč „projekty-app“), `EMAIL_FROM` (`projekty@updates.dronpro.cz` — jediná ověřená doména v Resend)
 - Clerk: JWT template `convex` (aud + email/name/picture claims), Google OAuth zapnutý; role se drží v Convex tabulce `users`, ne v Clerku. Test admin pro vizuální kontrolu: `test.admin@dronpro.cz` (sign-in token přes `clerk api /sign_in_tokens`).
 - Seed 11 počátečních projektů: Nastavení → „Založit počáteční projekty“ (idempotentní).
