@@ -1,0 +1,78 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { useMutation, useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
+import { GanttChart, type GanttProject, type GanttMoveEvent } from "./GanttChart";
+import { useMe } from "@/components/layout/AuthGuard";
+import { dateToISO } from "@/lib/dates";
+import { toast } from "@/lib/toast";
+import { errorToast } from "@/lib/convexError";
+import { FilterBar, FilterSelect } from "@/components/admin/filters";
+import { PRIORITIES, PRIORITY_LABEL } from "@/lib/constants";
+
+export function GanttView() {
+  const { canEdit } = useMe();
+  const updateProject = useMutation(api.projects.update);
+  const updateSubtask = useMutation(api.subtasks.update);
+  const users = useQuery(api.users.list) ?? [];
+  const projects = useQuery(api.projects.list, { scope: "active" });
+  const [projectId, setProjectId] = useState<string | undefined>();
+  const [ownerId, setOwnerId] = useState<string | undefined>();
+  const [priority, setPriority] = useState<string | undefined>();
+  // Detailní subúkoly potřebujeme pro všechny projekty → 1 query per project by bylo drahé; použijeme share-like agregaci.
+  const full = useQuery(api.gantt.data, {});
+
+  const data: GanttProject[] = useMemo(() => {
+    if (!full) return [];
+    return full.filter((p) => {
+      if (projectId && p._id !== projectId) return false;
+      if (priority && p.priority !== priority) return false;
+      if (ownerId && !p.owners.some((o) => o.userId === ownerId) && !p.subtasks.some((s) => s.assigneeIds.includes(ownerId as Id<"users">))) return false;
+      return true;
+    }).map((p) => ({
+      ...p,
+      subtasks: ownerId ? p.subtasks.filter((s) => s.assigneeIds.includes(ownerId as Id<"users">) || p.owners.some((o) => o.userId === ownerId)) : p.subtasks,
+    }));
+  }, [full, projectId, ownerId, priority]);
+
+  /**
+   * Drag & drop v Ganttu → uložit termíny.
+   * - položka bez původního startu: tažení těla posune jen deadline; levý úchyt nastaví start explicitně
+   * - long-term projekt (bez deadline): mění se jen start
+   */
+  const onMove = async (e: GanttMoveEvent) => {
+    const start = dateToISO(e.startAt);
+    const end = dateToISO(e.endAt);
+    const patch: { startDate?: string; deadline?: string } = {};
+    if (e.hadStart) {
+      patch.startDate = start;
+    } else {
+      // původně jen deadline: pokud se levý okraj posunul jinam než na "den před deadlinem", uživatel chce start
+      const derived = new Date(e.endAt); derived.setDate(derived.getDate() - 1);
+      if (dateToISO(derived) !== start) patch.startDate = start;
+    }
+    if (e.hadEnd && !e.isLongTerm) patch.deadline = end;
+    if (!Object.keys(patch).length) return;
+    try {
+      if (e.kind === "project") await updateProject({ id: e.id as Id<"projects">, patch });
+      else await updateSubtask({ id: e.id as Id<"subtasks">, patch });
+      toast("Termín upraven", "success");
+    } catch (err) { errorToast(err); }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div><h1 className="text-2xl">Gantt</h1><p className="text-sm text-a-text-3">Projekt = hlavní řádek, subúkoly po rozbalení. Položky bez termínu jsou v samostatné sekci.</p></div>
+        <FilterBar onClear={() => { setProjectId(undefined); setOwnerId(undefined); setPriority(undefined); }}>
+          <FilterSelect value={projectId} onChange={setProjectId} allLabel="Všechny projekty" options={(projects ?? []).map((p) => ({ label: p.name, value: p._id }))} />
+          <FilterSelect value={ownerId} onChange={setOwnerId} allLabel="Vlastník / odpovědný" options={users.map((u) => ({ label: u.name ?? u.email, value: u._id }))} />
+          <FilterSelect value={priority} onChange={setPriority} allLabel="Priorita" options={PRIORITIES.map((p) => ({ label: PRIORITY_LABEL[p], value: p }))} />
+        </FilterBar>
+      </div>
+      {full === undefined ? <div className="text-sm text-a-text-3">Načítám…</div> : <GanttChart projects={data} onMove={canEdit ? onMove : undefined} />}
+    </div>
+  );
+}

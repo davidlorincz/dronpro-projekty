@@ -1,0 +1,470 @@
+@import "tailwindcss";
+
+@font-face {
+  font-family: 'Rapid Variable';
+  src: url('/fonts/DronProRapidVariable-MedExt.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Indivisible';
+  src: url('/fonts/indivisible.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+
+@layer base {
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Rapid Variable', system-ui, sans-serif !important;
+    text-transform: uppercase !important;
+    color: var(--a-heading, #2626FF) !important;
+  }
+  button:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
+:root {
+  /* Light Theme Color Palette */
+  --background: #FFFFFF;
+  --background-secondary: #F8FAFC;
+  --foreground: #1F2937;
+  --foreground-muted: #6B7280;
+  --border: #E5E7EB;
+  --border-hover: #D1D5DB;
+
+  /* Accent colors - DronPro Cyan */
+  --accent-primary: #06B6D4;
+  --accent-hover: #0891B2;
+  --accent-light: #CFFAFE;
+
+  /* Legacy DronPro colors for compatibility */
+  --dp-green: #06B6D4;
+  --dp-red: #EF4444;
+
+  /* Neutral grays */
+  --dp-grey-100: #F3F4F6;
+  --dp-grey-200: #E5E7EB;
+  --dp-grey-300: #D1D5DB;
+  --dp-grey-400: #9CA3AF;
+  --dp-grey-500: #6B7280;
+  --dp-grey-600: #4B5563;
+  --dp-grey-700: #374151;
+
+  /* Admin semantic tokens — light defaults */
+  --a-bg: #F8FAFC;
+  --a-surface: #FFFFFF;
+  --a-elevated: #F3F4F6;
+  --a-input: #FFFFFF;
+  --a-text: #111827;
+  --a-text-2: #374151;
+  --a-text-3: #6B7280;
+  --a-text-4: #9CA3AF;
+  --a-border: #E5E7EB;
+  --a-border-subtle: #F3F4F6;
+  --a-hover: #F9FAFB;
+  --a-accent-bg: #ECFEFF;
+  --a-accent-text: #0E7490;
+  --a-heading: #2626FF;
+  --a-ring-offset: #FFFFFF;
+  --a-text-warning: #d97706;
+  --a-text-success: #16a34a;
+
+  /* Badge tinted variants */
+  --badge-available-bg: #D1FAE5;
+  --badge-available-text: #047857;
+  --badge-rented-bg: #DBEAFE;
+  --badge-rented-text: #1D4ED8;
+  --badge-buffer-bg: #FEF3C7;
+  --badge-buffer-text: #B45309;
+  --badge-maintenance-bg: #FEE2E2;
+  --badge-maintenance-text: #B91C1C;
+
+  /* Stavy projektů / subúkolů */
+  --st-not-started-bg: #F3F4F6; --st-not-started-text: #4B5563;
+  --st-in-progress-bg: #CFFAFE; --st-in-progress-text: #0E7490;
+  --st-waiting-bg: #FEF3C7;     --st-waiting-text: #B45309;
+  --st-blocked-bg: #FEE2E2;     --st-blocked-text: #B91C1C;
+  --st-on-hold-bg: #EDE9FE;     --st-on-hold-text: #6D28D9;
+  --st-finished-bg: #D1FAE5;    --st-finished-text: #047857;
+  --st-cancelled-bg: #F3F4F6;   --st-cancelled-text: #9CA3AF;
+
+  /* Priority */
+  --pr-top-bg: #FEE2E2;    --pr-top-text: #B91C1C;
+  --pr-middle-bg: #FEF3C7; --pr-middle-text: #B45309;
+  --pr-low-bg: #F3F4F6;    --pr-low-text: #4B5563;
+
+  /* Deadline flagy */
+  --dl-overdue: #DC2626;
+  --dl-soon: #EA580C;
+  --dl-ok: #6B7280;
+  --dl-done: #16A34A;
+
+  /* shadcn-kompatibilní aliasy (Kibo UI Gantt) */
+  --color-muted: var(--a-elevated);
+  --color-muted-foreground: var(--a-text-3);
+  --color-card: var(--a-surface);
+  --color-card-foreground: var(--a-text);
+  --color-primary: var(--accent-primary);
+  --color-primary-foreground: #ffffff;
+  --color-secondary: var(--a-elevated);
+  --color-secondary-foreground: var(--a-text-2);
+  --color-accent: var(--a-hover);
+  --color-accent-foreground: var(--a-text);
+  --color-popover: var(--a-surface);
+  --color-popover-foreground: var(--a-text);
+  --color-input: var(--a-border);
+  --color-ring: var(--accent-primary);
+  --radius: 0.75rem;
+}
+
+/* Admin dark theme */
+.admin-dark {
+  --a-bg: #0d1117;
+  --a-surface: #161b22;
+  --a-elevated: #21262d;
+  --a-input: #0d1117;
+  --a-text: #e6edf3;
+  --a-text-2: #b1bac4;
+  --a-text-3: #8b949e;
+  --a-text-4: #636c76;
+  --a-border: #30363d;
+  --a-border-subtle: #21262d;
+  --a-hover: #1c2128;
+  --a-accent-bg: #0d2847;
+  --a-accent-text: #58a6ff;
+  --a-heading: #79c0ff;
+  --a-ring-offset: #161b22;
+  --a-text-warning: #fbbf24;
+  --a-text-success: #4ade80;
+
+  /* Badge tinted variants — dark */
+  --badge-available-bg: rgba(16, 185, 129, 0.15);
+  --badge-available-text: #3fb950;
+  --badge-rented-bg: rgba(59, 130, 246, 0.15);
+  --badge-rented-text: #58a6ff;
+  --badge-buffer-bg: rgba(245, 158, 11, 0.15);
+  --badge-buffer-text: #d29922;
+  --badge-maintenance-bg: rgba(239, 68, 68, 0.15);
+  --badge-maintenance-text: #f85149;
+
+  --st-not-started-bg: rgba(139,148,158,0.15); --st-not-started-text: #b1bac4;
+  --st-in-progress-bg: rgba(6,182,212,0.18);   --st-in-progress-text: #67e8f9;
+  --st-waiting-bg: rgba(245,158,11,0.15);      --st-waiting-text: #d29922;
+  --st-blocked-bg: rgba(239,68,68,0.15);       --st-blocked-text: #f85149;
+  --st-on-hold-bg: rgba(139,92,246,0.18);      --st-on-hold-text: #c4b5fd;
+  --st-finished-bg: rgba(16,185,129,0.15);     --st-finished-text: #3fb950;
+  --st-cancelled-bg: rgba(139,148,158,0.1);    --st-cancelled-text: #636c76;
+
+  --pr-top-bg: rgba(239,68,68,0.15);    --pr-top-text: #f85149;
+  --pr-middle-bg: rgba(245,158,11,0.15); --pr-middle-text: #d29922;
+  --pr-low-bg: rgba(139,148,158,0.15);  --pr-low-text: #b1bac4;
+
+  --dl-overdue: #f85149;
+  --dl-soon: #fb923c;
+  --dl-ok: #8b949e;
+  --dl-done: #3fb950;
+}
+
+@theme inline {
+  /* Aplikace je celá „admin“ → background/foreground/border sledují admin tokeny (světlý i tmavý režim). */
+  --color-background: var(--a-surface);
+  --color-background-secondary: var(--a-bg);
+  --color-foreground: var(--a-text);
+  --color-foreground-muted: var(--a-text-3);
+  --color-accent-primary: var(--accent-primary);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-light: var(--accent-light);
+  --color-border: var(--a-border);
+
+  --color-dp-green: var(--dp-green);
+  --color-dp-red: var(--dp-red);
+  --color-dp-grey-100: var(--dp-grey-100);
+  --color-dp-grey-200: var(--dp-grey-200);
+  --color-dp-grey-300: var(--dp-grey-300);
+  --color-dp-grey-400: var(--dp-grey-400);
+  --color-dp-grey-500: var(--dp-grey-500);
+  --color-dp-grey-600: var(--dp-grey-600);
+  --color-dp-grey-700: var(--dp-grey-700);
+
+  /* Admin semantic color tokens */
+  --color-a-bg: var(--a-bg);
+  --color-a-surface: var(--a-surface);
+  --color-a-elevated: var(--a-elevated);
+  --color-a-input: var(--a-input);
+  --color-a-text: var(--a-text);
+  --color-a-text-2: var(--a-text-2);
+  --color-a-text-3: var(--a-text-3);
+  --color-a-text-4: var(--a-text-4);
+  --color-a-border: var(--a-border);
+  --color-a-border-subtle: var(--a-border-subtle);
+  --color-a-hover: var(--a-hover);
+  --color-a-accent-bg: var(--a-accent-bg);
+  --color-a-accent-text: var(--a-accent-text);
+  --color-a-ring-offset: var(--a-ring-offset);
+  --color-a-text-warning: var(--a-text-warning);
+  --color-a-text-success: var(--a-text-success);
+
+  /* Badge tinted variant tokens */
+  --color-badge-available-bg: var(--badge-available-bg);
+  --color-badge-available-text: var(--badge-available-text);
+  --color-badge-rented-bg: var(--badge-rented-bg);
+  --color-badge-rented-text: var(--badge-rented-text);
+  --color-badge-buffer-bg: var(--badge-buffer-bg);
+  --color-badge-buffer-text: var(--badge-buffer-text);
+  --color-badge-maintenance-bg: var(--badge-maintenance-bg);
+  --color-badge-maintenance-text: var(--badge-maintenance-text);
+
+  --color-st-not-started-bg: var(--st-not-started-bg); --color-st-not-started-text: var(--st-not-started-text);
+  --color-st-in-progress-bg: var(--st-in-progress-bg); --color-st-in-progress-text: var(--st-in-progress-text);
+  --color-st-waiting-bg: var(--st-waiting-bg); --color-st-waiting-text: var(--st-waiting-text);
+  --color-st-blocked-bg: var(--st-blocked-bg); --color-st-blocked-text: var(--st-blocked-text);
+  --color-st-on-hold-bg: var(--st-on-hold-bg); --color-st-on-hold-text: var(--st-on-hold-text);
+  --color-st-finished-bg: var(--st-finished-bg); --color-st-finished-text: var(--st-finished-text);
+  --color-st-cancelled-bg: var(--st-cancelled-bg); --color-st-cancelled-text: var(--st-cancelled-text);
+  --color-pr-top-bg: var(--pr-top-bg); --color-pr-top-text: var(--pr-top-text);
+  --color-pr-middle-bg: var(--pr-middle-bg); --color-pr-middle-text: var(--pr-middle-text);
+  --color-pr-low-bg: var(--pr-low-bg); --color-pr-low-text: var(--pr-low-text);
+  --color-dl-overdue: var(--dl-overdue);
+  --color-dl-soon: var(--dl-soon);
+  --color-dl-ok: var(--dl-ok);
+  --color-dl-done: var(--dl-done);
+
+  /* shadcn aliasy pro Kibo Gantt */
+  --color-muted: var(--a-elevated);
+  --color-muted-foreground: var(--a-text-3);
+  --color-card: var(--a-surface);
+  --color-card-foreground: var(--a-text);
+  --color-primary: var(--accent-primary);
+  --color-primary-foreground: #ffffff;
+  --color-secondary: var(--a-elevated);
+  --color-secondary-foreground: var(--a-text-2);
+  --color-accent: var(--a-hover);
+  --color-accent-foreground: var(--a-text);
+  --color-popover: var(--a-surface);
+  --color-popover-foreground: var(--a-text);
+  --color-input: var(--a-border);
+  --color-ring: var(--accent-primary);
+  --color-backdrop: var(--a-surface);
+  --color-destructive: #DC2626;
+
+  --font-heading: 'Rapid Variable', system-ui, sans-serif;
+  --font-sans: 'Indivisible', system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--a-bg);
+  color: var(--a-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+/* Card styles */
+.card {
+  background: #FFFFFF;
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  border-radius: 12px;
+}
+
+.card-hover:hover {
+  border-color: var(--accent-primary);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+}
+
+/* Admin dark card override */
+.admin-dark .card {
+  background: var(--a-surface);
+  border-color: var(--a-border);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+/* Custom scrollbar - light theme */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--dp-grey-100);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--dp-grey-300);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--dp-grey-400);
+}
+
+/* Admin dark scrollbar */
+.admin-dark ::-webkit-scrollbar-track {
+  background: #161b22;
+}
+.admin-dark ::-webkit-scrollbar-thumb {
+  background: #30363d;
+}
+.admin-dark ::-webkit-scrollbar-thumb:hover {
+  background: #484f58;
+}
+
+/* Selection */
+::selection {
+  background: var(--accent-light);
+  color: var(--foreground);
+}
+
+.admin-dark ::selection {
+  background: rgba(31, 111, 235, 0.2);
+  color: #e6edf3;
+}
+
+/* Focus visible */
+:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+.admin-dark :focus-visible {
+  outline-color: #58a6ff;
+}
+
+/* Autofill styling */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus,
+select:-webkit-autofill,
+select:-webkit-autofill:hover,
+select:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px var(--background) inset;
+  -webkit-text-fill-color: var(--foreground);
+  caret-color: var(--foreground);
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+.admin-dark input:-webkit-autofill,
+.admin-dark input:-webkit-autofill:hover,
+.admin-dark input:-webkit-autofill:focus,
+.admin-dark textarea:-webkit-autofill,
+.admin-dark textarea:-webkit-autofill:hover,
+.admin-dark textarea:-webkit-autofill:focus,
+.admin-dark select:-webkit-autofill,
+.admin-dark select:-webkit-autofill:hover,
+.admin-dark select:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px var(--a-input) inset;
+  -webkit-text-fill-color: var(--a-text);
+  caret-color: var(--a-text);
+}
+
+/* Admin dark native select options */
+.admin-dark select option {
+  background: var(--a-surface);
+  color: var(--a-text);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-out;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.5s ease-out;
+}
+
+.animate-slide-down {
+  animation: slideDown 0.5s ease-out;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.3s ease-out;
+}
+
+/* Stagger children animations */
+.stagger-children > * {
+  opacity: 0;
+  animation: slideUp 0.5s ease-out forwards;
+}
+
+.stagger-children > *:nth-child(1) { animation-delay: 0.05s; }
+.stagger-children > *:nth-child(2) { animation-delay: 0.1s; }
+.stagger-children > *:nth-child(3) { animation-delay: 0.15s; }
+.stagger-children > *:nth-child(4) { animation-delay: 0.2s; }
+.stagger-children > *:nth-child(5) { animation-delay: 0.25s; }
+.stagger-children > *:nth-child(6) { animation-delay: 0.3s; }
+.stagger-children > *:nth-child(7) { animation-delay: 0.35s; }
+.stagger-children > *:nth-child(8) { animation-delay: 0.4s; }
+
+@keyframes highlight-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.animate-highlight-pulse {
+  animation: highlight-pulse 1.5s ease-in-out 3;
+}
+
+
+/* Progress bar */
+.progress-track { background: var(--a-elevated); border-radius: 9999px; overflow: hidden; height: 6px; }
+.progress-fill { background: var(--accent-primary); height: 100%; border-radius: 9999px; transition: width .3s ease; }
+
+/* Overdue hatch for Gantt bars */
+.overdue-hatch {
+  background-image: repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(220,38,38,0.35) 4px, rgba(220,38,38,0.35) 7px);
+}
+
+@keyframes slideInRight { from { transform: translateX(24px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+.animate-slide-in { animation: slideInRight .2s ease-out; }

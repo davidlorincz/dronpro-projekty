@@ -1,0 +1,171 @@
+// Sdílené výpočty (progress, deadline flagy, obohacení projektů) pro queries.
+import type { Doc, Id } from "./_generated/dataModel";
+import type { QueryCtx, MutationCtx } from "./_generated/server";
+
+export type Status = Doc<"projects">["status"];
+export type Priority = Doc<"projects">["priority"];
+export type DeadlineFlag = "overdue" | "soon" | "ok" | "done" | "missing" | "longterm";
+
+const DAY_MS = 86_400_000;
+export const PRIORITY_ORDER: Record<Priority, number> = { top: 0, middle: 1, low: 2 };
+
+export function todayISO(): string {
+  // Praha ≈ UTC+1/+2; pro datumové srovnání stačí lokální den serveru posunutý na Evropu.
+  const d = new Date(Date.now() + 2 * 60 * 60 * 1000);
+  return d.toISOString().slice(0, 10);
+}
+
+export function isoToTime(iso: string): number {
+  const [y, m, d] = iso.split("-").map(Number);
+  return Date.UTC(y, m - 1, d);
+}
+
+export function daysBetween(fromISO: string, toISO: string): number {
+  return Math.round((isoToTime(toISO) - isoToTime(fromISO)) / DAY_MS);
+}
+
+export function isOpen(status: Status) {
+  return status !== "finished" && status !== "cancelled";
+}
+
+export function deadlineFlag(opts: {
+  deadline?: string;
+  status: Status;
+  isLongTerm?: boolean;
+  today: string;
+}): DeadlineFlag {
+  const { deadline, status, isLongTerm, today } = opts;
+  if (!isOpen(status)) return "done";
+  if (!deadline) return isLongTerm ? "longterm" : "missing";
+  if (deadline < today) return "overdue";
+  if (daysBetween(today, deadline) <= 7) return "soon";
+  return "ok";
+}
+
+export type UserLite = { _id: Id<"users">; name?: string; email: string; avatarUrl?: string };
+
+export function userLite(u: Doc<"users">): UserLite {
+  return { _id: u._id, name: u.name, email: u.email, avatarUrl: u.avatarUrl };
+}
+
+export async function loadUserMap(ctx: QueryCtx | MutationCtx) {
+  const users = await ctx.db.query("users").collect();
+  return new Map(users.map((u) => [u._id, userLite(u)]));
+}
+
+export type SubtaskEnriched = Doc<"subtasks"> & {
+  assignees: UserLite[];
+  deadlineFlag: DeadlineFlag;
+  isOverdue: boolean;
+  projectName?: string;
+};
+
+export function enrichSubtask(
+  s: Doc<"subtasks">,
+  userMap: Map<Id<"users">, UserLite>,
+  today: string,
+  projectName?: string
+): SubtaskEnriched {
+  const flag = deadlineFlag({ deadline: s.deadline, status: s.status, today });
+  return {
+    ...s,
+    assignees: s.assigneeIds.map((id) => userMap.get(id)).filter(Boolean) as UserLite[],
+    deadlineFlag: flag,
+    isOverdue: flag === "overdue",
+    projectName,
+  };
+}
+
+export type ProjectStats = {
+  progress: number | null; // null = bez subúkolů
+  totalActive: number; // bez cancelled
+  doneCount: number;
+  openCount: number;
+  overdueCount: number;
+  blockedCount: number;
+  nearestOpenDeadline?: string;
+  allDone: boolean; // všechny aktivní subúkoly hotové (>0)
+};
+
+export function computeStats(subtasks: Doc<"subtasks">[], today: string): ProjectStats {
+  const live = subtasks.filter((s) => !s.archivedAt);
+  const active = live.filter((s) => s.status !== "cancelled");
+  const done = active.filter((s) => s.status === "finished");
+  const open = active.filter((s) => s.status !== "finished");
+  const overdue = open.filter((s) => s.deadline && s.deadline < today);
+  const blocked = open.filter((s) => s.status === "blocked");
+  const nearest = open
+    .map((s) => s.deadline)
+    .filter((d): d is string => !!d && d >= today)
+    .sort()[0];
+  return {
+    progress: active.length === 0 ? null : Math.round((done.length / active.length) * 100),
+    totalActive: active.length,
+    doneCount: done.length,
+    openCount: open.length,
+    overdueCount: overdue.length,
+    blockedCount: blocked.length,
+    nearestOpenDeadline: nearest,
+    allDone: active.length > 0 && open.length === 0,
+  };
+}
+
+export type ProjectEnriched = Doc<"projects"> & {
+  ownerUsers: (UserLite & { agenda?: string })[];
+  collaboratorUsers: UserLite[];
+  stats: ProjectStats;
+  deadlineFlag: DeadlineFlag;
+  isOverdue: boolean;
+  hasWarning: boolean; // blocked nebo overdue (projekt či subúkol)
+};
+
+export function enrichProject(
+  p: Doc<"projects">,
+  subtasks: Doc<"subtasks">[],
+  userMap: Map<Id<"users">, UserLite>,
+  today: string
+): ProjectEnriched {
+  const stats = computeStats(subtasks, today);
+  const flag = deadlineFlag({ deadline: p.deadline, status: p.status, isLongTerm: p.isLongTerm, today });
+  const isOverdue = flag === "overdue";
+  return {
+    ...p,
+    ownerUsers: p.owners
+      .map((o) => {
+        const u = userMap.get(o.userId);
+        return u ? { ...u, agenda: o.agenda } : null;
+      })
+      .filter(Boolean) as (UserLite & { agenda?: string })[],
+    collaboratorUsers: p.collaboratorIds.map((id) => userMap.get(id)).filter(Boolean) as UserLite[],
+    stats,
+    deadlineFlag: flag,
+    isOverdue,
+    hasWarning: p.status === "blocked" || isOverdue || stats.overdueCount > 0 || stats.blockedCount > 0,
+  };
+}
+
+/** Výchozí řazení: priorita TOP→Low, uvnitř nejbližší deadline (bez deadline nakonec). */
+export function sortProjects<T extends { priority: Priority; deadline?: string; name: string }>(list: T[]) {
+  return [...list].sort((a, b) => {
+    const p = PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
+    if (p !== 0) return p;
+    if (a.deadline && b.deadline) return a.deadline.localeCompare(b.deadline);
+    if (a.deadline) return -1;
+    if (b.deadline) return 1;
+    return a.name.localeCompare(b.name, "cs");
+  });
+}
+
+export async function loadSubtasksByProject(ctx: QueryCtx | MutationCtx, projectIds: Id<"projects">[]) {
+  const map = new Map<Id<"projects">, Doc<"subtasks">[]>();
+  await Promise.all(
+    projectIds.map(async (id) => {
+      const list = await ctx.db
+        .query("subtasks")
+        .withIndex("by_project", (q) => q.eq("projectId", id))
+        .collect();
+      map.set(id, list);
+    })
+  );
+  return map;
+}
