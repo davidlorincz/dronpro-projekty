@@ -41,14 +41,17 @@ export const removeUserByClerkId = internalMutation({
  * `npx convex run maintenance:seedProjectDates`
  */
 export const seedProjectDates = internalMutation({
-  args: {},
-  handler: async (ctx) => {
+  args: { ownerEmail: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const owner = args.ownerEmail
+      ? await ctx.db.query("users").withIndex("by_email", (q) => q.eq("email", args.ownerEmail!)).first()
+      : null;
     const plan: Record<string, { start: string; deadline?: string; priority: "top" | "middle" | "low"; status: "not_started" | "in_progress" | "waiting" | "blocked" | "on_hold"; longTerm?: boolean; blockedReason?: string }> = {
       "Stabilizace týmu": { start: "2026-08-03", deadline: "2026-10-30", priority: "top", status: "in_progress" },
       "Firemní procesy a operations": { start: "2026-08-10", priority: "middle", status: "in_progress", longTerm: true },
       "Kroužky pro děti": { start: "2026-08-17", deadline: "2026-09-15", priority: "top", status: "in_progress" },
       "Kroužky na základních školách": { start: "2026-08-24", deadline: "2026-09-30", priority: "top", status: "waiting" },
-      "Úprava webu – produkty – knowledge base": { start: "2026-08-01", deadline: "2026-08-14", priority: "middle", status: "in_progress" },
+      "Úprava webu – produkty – knowledge base": { start: "2026-08-18", deadline: "2026-09-12", priority: "middle", status: "in_progress" },
       "B2B oslovování firem": { start: "2026-09-01", deadline: "2026-11-30", priority: "middle", status: "not_started" },
       "Eventy a eventový plán": { start: "2026-08-15", deadline: "2026-12-15", priority: "middle", status: "blocked", blockedReason: "Čeká na potvrzení rozpočtu" },
       "Návazná komunikace s klienty": { start: "2026-08-20", deadline: "2026-09-20", priority: "low", status: "not_started" },
@@ -68,6 +71,7 @@ export const seedProjectDates = internalMutation({
         priority: d.priority,
         status: d.status,
         blockedReason: d.blockedReason,
+        ...(owner && p.owners.length === 0 ? { owners: [{ userId: owner._id }] } : {}),
         updatedAt: Date.now(),
       });
       n++;
