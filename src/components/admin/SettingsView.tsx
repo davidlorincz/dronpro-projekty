@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { errorToast } from "@/lib/convexError";
 import { toast } from "@/lib/toast";
 import { formatDateTime } from "@/lib/dates";
-import { Copy, Link2, Ban, Database } from "lucide-react";
+import { Copy, Link2, Ban } from "lucide-react";
 
 export function SettingsView() {
   const { isAdmin } = useMe();
@@ -18,7 +18,6 @@ export function SettingsView() {
   const createLink = useMutation(api.share.create);
   const revoke = useMutation(api.share.revoke);
   const setSetting = useMutation(api.settings.set);
-  const seed = useMutation(api.seed.initialProjects);
   const [label, setLabel] = useState("");
   const origin = typeof window !== "undefined" ? window.location.origin : "";
 
@@ -64,11 +63,6 @@ export function SettingsView() {
         <p className="text-xs text-a-text-4">In-app notifikace (zvoneček) běží vždy. Denně v 8:00 se generují upozornění „po termínu“ a „do 7 dní“ pro odpovědné osoby.</p>
       </section>
 
-      <section className="card p-5 space-y-3">
-        <div className="text-base text-a-text font-semibold flex items-center gap-2"><Database className="h-4 w-4" /> Počáteční data</div>
-        <p className="text-sm text-a-text-3">Založí 11 potvrzených projektů ze zadání (bez subúkolů). Přeskočí ty, které už existují.</p>
-        <Button size="sm" variant="outline" onClick={async () => { try { const n = await seed({}); toast(`Založeno ${n} projektů`, "success"); } catch (e) { errorToast(e); } }}>Založit počáteční projekty</Button>
-      </section>
     </div>
   );
 }
