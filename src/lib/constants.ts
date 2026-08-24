@@ -88,6 +88,49 @@ export const ROLE_LABEL: Record<Role, string> = {
   viewer: "Pouze čtení",
 };
 
+// ---- Content plán -----------------------------------------------------------
+
+export const CHANNELS = ["instagram", "facebook", "linkedin", "tiktok", "youtube", "newsletter", "web", "other"] as const;
+export type Channel = (typeof CHANNELS)[number];
+export const CHANNEL_LABEL: Record<Channel, string> = {
+  instagram: "Instagram",
+  facebook: "Facebook",
+  linkedin: "LinkedIn",
+  tiktok: "TikTok",
+  youtube: "YouTube",
+  newsletter: "Newsletter",
+  web: "Web / blog",
+  other: "Ostatní",
+};
+/** Barvy chipů v kalendáři — tokeny v globals.css (světlý i tmavý režim). */
+export const CHANNEL_CLASS: Record<Channel, string> = {
+  instagram: "bg-ch-instagram-bg text-ch-instagram-text",
+  facebook: "bg-ch-facebook-bg text-ch-facebook-text",
+  linkedin: "bg-ch-linkedin-bg text-ch-linkedin-text",
+  tiktok: "bg-ch-tiktok-bg text-ch-tiktok-text",
+  youtube: "bg-ch-youtube-bg text-ch-youtube-text",
+  newsletter: "bg-ch-newsletter-bg text-ch-newsletter-text",
+  web: "bg-ch-web-bg text-ch-web-text",
+  other: "bg-ch-other-bg text-ch-other-text",
+};
+
+export const CONTENT_STATUSES = ["idea", "planned", "ready", "published", "cancelled"] as const;
+export type ContentStatus = (typeof CONTENT_STATUSES)[number];
+export const CONTENT_STATUS_LABEL: Record<ContentStatus, string> = {
+  idea: "Nápad",
+  planned: "Naplánováno",
+  ready: "Připraveno",
+  published: "Publikováno",
+  cancelled: "Zrušeno",
+};
+export const CONTENT_STATUS_CLASS: Record<ContentStatus, string> = {
+  idea: "bg-st-not-started-bg text-st-not-started-text",
+  planned: "bg-st-waiting-bg text-st-waiting-text",
+  ready: "bg-st-in-progress-bg text-st-in-progress-text",
+  published: "bg-st-finished-bg text-st-finished-text",
+  cancelled: "bg-st-cancelled-bg text-st-cancelled-text line-through",
+};
+
 export type DeadlineFlag = "overdue" | "soon" | "ok" | "done" | "missing" | "longterm";
 export const DEADLINE_FLAG_CLASS: Record<DeadlineFlag, string> = {
   overdue: "text-dl-overdue font-semibold",

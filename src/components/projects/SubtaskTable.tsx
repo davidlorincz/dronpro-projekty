@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useMutation } from "convex/react";
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
@@ -34,6 +34,9 @@ export function SubtaskTable({ project, editable, onSelect, selectedId }: { proj
   const [newTitle, setNewTitle] = useState("");
   const [adding, setAdding] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  const addInputRef = useRef<HTMLInputElement>(null);
+
+  const focusAdd = () => addInputRef.current?.focus();
 
   const users = useMemo(() => {
     const m = new Map<string, { _id: string; name?: string; email: string }>();
@@ -79,7 +82,14 @@ export function SubtaskTable({ project, editable, onSelect, selectedId }: { proj
   return (
     <div className="card">
       <div className="px-4 pt-4 pb-2 flex flex-wrap items-center gap-3 justify-between">
-        <div className="text-base text-a-text font-semibold">Subúkoly <span className="text-a-text-4 font-normal">({project.subtasks.length})</span></div>
+        <div className="flex items-center gap-3">
+          <div className="text-base text-a-text font-semibold">Subúkoly <span className="text-a-text-4 font-normal">({project.subtasks.length})</span></div>
+          {editable && (
+            <button onClick={focusAdd} className="inline-flex items-center gap-1 rounded-xl bg-a-accent-bg text-a-accent-text px-2.5 py-1 text-xs font-semibold hover:opacity-80 cursor-pointer">
+              <Plus className="h-3.5 w-3.5" /> Přidat subúkol
+            </button>
+          )}
+        </div>
         <FilterBar onClear={() => { setFStatus(undefined); setFOwner(undefined); setFPhase(undefined); setFDue("all"); }}>
           <FilterSelect value={fStatus} onChange={setFStatus} allLabel="Stav" options={STATUSES.map((s) => ({ label: STATUS_LABEL[s], value: s }))} />
           <FilterSelect value={fOwner} onChange={setFOwner} allLabel="Odpovědný" options={users.map((u) => ({ label: u.name ?? u.email, value: u._id }))} />
@@ -114,7 +124,15 @@ export function SubtaskTable({ project, editable, onSelect, selectedId }: { proj
                   />
                 ))}
                 {filtered.length === 0 && (
-                  <tr><td colSpan={9} className="px-4 py-6 text-center text-a-text-4 text-sm">{project.subtasks.length === 0 ? "Zatím žádné subúkoly — přidej první níže." : "Filtru neodpovídá žádný subúkol."}</td></tr>
+                  <tr><td colSpan={9} className="px-4 py-6 text-center text-a-text-4 text-sm">
+                    {project.subtasks.length === 0 ? (
+                      editable ? (
+                        <button onClick={focusAdd} className="inline-flex items-center gap-1.5 rounded-xl border border-a-border px-3 py-1.5 text-sm text-a-accent-text font-semibold hover:bg-a-hover cursor-pointer">
+                          <Plus className="h-4 w-4" /> Přidat první subúkol
+                        </button>
+                      ) : "Zatím žádné subúkoly."
+                    ) : "Filtru neodpovídá žádný subúkol."}
+                  </td></tr>
                 )}
               </tbody>
         </table>
@@ -124,10 +142,13 @@ export function SubtaskTable({ project, editable, onSelect, selectedId }: { proj
 
       {editable && (
         <div className="px-4 py-3 border-t border-a-border-subtle flex items-center gap-2">
-          <Plus className="h-4 w-4 text-a-text-4" />
-          <input value={newTitle} onChange={(e) => setNewTitle(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addSubtask(); }}
-            placeholder="Nový subúkol… (Enter přidá a otevře detail)" className="flex-1 bg-transparent text-sm outline-none placeholder:text-a-text-4" disabled={adding} />
-          <button onClick={addSubtask} disabled={!newTitle.trim() || adding} className="text-xs font-semibold text-a-accent-text disabled:opacity-40 cursor-pointer">Přidat</button>
+          <input ref={addInputRef} value={newTitle} onChange={(e) => setNewTitle(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addSubtask(); }}
+            placeholder="Nový subúkol… (Enter přidá a otevře detail)"
+            className="flex-1 rounded-xl border border-a-border bg-a-input px-3 py-2 text-sm text-a-text outline-none focus:border-cyan-500 placeholder:text-a-text-4" disabled={adding} />
+          <button onClick={addSubtask} disabled={!newTitle.trim() || adding}
+            className="inline-flex items-center gap-1 rounded-xl bg-accent-primary hover:bg-accent-hover text-white px-3 py-2 text-sm font-semibold transition-colors disabled:opacity-40 cursor-pointer">
+            <Plus className="h-4 w-4" /> Přidat
+          </button>
         </div>
       )}
 

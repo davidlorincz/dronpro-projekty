@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, FolderKanban, GanttChartSquare, Users, Settings, Archive, HelpCircle, BellRing } from "lucide-react";
+import { LayoutDashboard, FolderKanban, GanttChartSquare, Users, Settings, Archive, HelpCircle, BellRing, CalendarDays } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DronProLogo } from "@/components/shared/DronProLogo";
 import { useMe } from "./AuthGuard";
@@ -16,6 +16,7 @@ const navGroups: { title: string | null; items: NavItem[] }[] = [
       { label: "Dashboard", href: "/", icon: LayoutDashboard, exact: true },
       { label: "Portfolio", href: "/projekty", icon: FolderKanban },
       { label: "Gantt", href: "/gantt", icon: GanttChartSquare },
+      { label: "Content plán", href: "/content", icon: CalendarDays },
       { label: "Archiv", href: "/archiv", icon: Archive },
     ],
   },

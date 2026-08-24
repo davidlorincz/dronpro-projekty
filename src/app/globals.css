@@ -95,6 +95,16 @@
   --pr-middle-bg: #FEF3C7; --pr-middle-text: #B45309;
   --pr-low-bg: #F3F4F6;    --pr-low-text: #4B5563;
 
+  /* Kanály content plánu */
+  --ch-instagram-bg: #FCE7F3;  --ch-instagram-text: #BE185D;
+  --ch-facebook-bg: #DBEAFE;   --ch-facebook-text: #1D4ED8;
+  --ch-linkedin-bg: #E0F2FE;   --ch-linkedin-text: #0369A1;
+  --ch-tiktok-bg: #F4F4F5;     --ch-tiktok-text: #3F3F46;
+  --ch-youtube-bg: #FEE2E2;    --ch-youtube-text: #B91C1C;
+  --ch-newsletter-bg: #FEF3C7; --ch-newsletter-text: #B45309;
+  --ch-web-bg: #CFFAFE;        --ch-web-text: #0E7490;
+  --ch-other-bg: #EDE9FE;      --ch-other-text: #6D28D9;
+
   /* Deadline flagy */
   --dl-overdue: #DC2626;
   --dl-soon: #EA580C;
@@ -161,6 +171,15 @@
   --pr-middle-bg: rgba(245,158,11,0.15); --pr-middle-text: #d29922;
   --pr-low-bg: rgba(139,148,158,0.15);  --pr-low-text: #b1bac4;
 
+  --ch-instagram-bg: rgba(236,72,153,0.18);  --ch-instagram-text: #f9a8d4;
+  --ch-facebook-bg: rgba(59,130,246,0.18);   --ch-facebook-text: #93c5fd;
+  --ch-linkedin-bg: rgba(14,165,233,0.18);   --ch-linkedin-text: #7dd3fc;
+  --ch-tiktok-bg: rgba(161,161,170,0.18);    --ch-tiktok-text: #d4d4d8;
+  --ch-youtube-bg: rgba(239,68,68,0.18);     --ch-youtube-text: #fca5a5;
+  --ch-newsletter-bg: rgba(245,158,11,0.18); --ch-newsletter-text: #fcd34d;
+  --ch-web-bg: rgba(6,182,212,0.18);         --ch-web-text: #67e8f9;
+  --ch-other-bg: rgba(139,92,246,0.18);      --ch-other-text: #c4b5fd;
+
   --dl-overdue: #f85149;
   --dl-soon: #fb923c;
   --dl-ok: #8b949e;
@@ -223,6 +242,14 @@
   --color-st-on-hold-bg: var(--st-on-hold-bg); --color-st-on-hold-text: var(--st-on-hold-text);
   --color-st-finished-bg: var(--st-finished-bg); --color-st-finished-text: var(--st-finished-text);
   --color-st-cancelled-bg: var(--st-cancelled-bg); --color-st-cancelled-text: var(--st-cancelled-text);
+  --color-ch-instagram-bg: var(--ch-instagram-bg); --color-ch-instagram-text: var(--ch-instagram-text);
+  --color-ch-facebook-bg: var(--ch-facebook-bg); --color-ch-facebook-text: var(--ch-facebook-text);
+  --color-ch-linkedin-bg: var(--ch-linkedin-bg); --color-ch-linkedin-text: var(--ch-linkedin-text);
+  --color-ch-tiktok-bg: var(--ch-tiktok-bg); --color-ch-tiktok-text: var(--ch-tiktok-text);
+  --color-ch-youtube-bg: var(--ch-youtube-bg); --color-ch-youtube-text: var(--ch-youtube-text);
+  --color-ch-newsletter-bg: var(--ch-newsletter-bg); --color-ch-newsletter-text: var(--ch-newsletter-text);
+  --color-ch-web-bg: var(--ch-web-bg); --color-ch-web-text: var(--ch-web-text);
+  --color-ch-other-bg: var(--ch-other-bg); --color-ch-other-text: var(--ch-other-text);
   --color-pr-top-bg: var(--pr-top-bg); --color-pr-top-text: var(--pr-top-text);
   --color-pr-middle-bg: var(--pr-middle-bg); --color-pr-middle-text: var(--pr-middle-text);
   --color-pr-low-bg: var(--pr-low-bg); --color-pr-low-text: var(--pr-low-text);

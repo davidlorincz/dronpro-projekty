@@ -36,6 +36,25 @@ export const todoValidator = v.object({
   dueDate: v.optional(v.string()), // YYYY-MM-DD
 });
 
+export const channelValidator = v.union(
+  v.literal("instagram"),
+  v.literal("facebook"),
+  v.literal("linkedin"),
+  v.literal("tiktok"),
+  v.literal("youtube"),
+  v.literal("newsletter"),
+  v.literal("web"),
+  v.literal("other")
+);
+
+export const contentStatusValidator = v.union(
+  v.literal("idea"),
+  v.literal("planned"),
+  v.literal("ready"),
+  v.literal("published"),
+  v.literal("cancelled")
+);
+
 export const ownerValidator = v.object({
   userId: v.id("users"),
   agenda: v.optional(v.string()), // rozdělení agendy mezi více vlastníků
@@ -118,6 +137,23 @@ export default defineSchema({
     .index("by_project_order", ["projectId", "order"])
     .index("by_deadline", ["deadline"])
     .index("by_status", ["status"]),
+
+  // Content plán na sociální sítě a další kanály. Položka bez data = zásobník nápadů.
+  contentItems: defineTable({
+    title: v.string(),
+    channel: channelValidator,
+    date: v.optional(v.string()), // YYYY-MM-DD publikace; bez data = nápad
+    status: contentStatusValidator,
+    assigneeIds: v.array(v.id("users")),
+    note: v.optional(v.string()),
+    links: v.array(linkValidator), // podklady, draft, publikovaný post
+    projectId: v.optional(v.id("projects")), // volitelná vazba na projekt (např. event)
+    archivedAt: v.optional(v.number()),
+    createdBy: v.id("users"),
+    updatedAt: v.number(),
+  })
+    .index("by_date", ["date"])
+    .index("by_project", ["projectId"]),
 
   // Historie změn (audit log) — projekt i subúkol.
   activity: defineTable({
