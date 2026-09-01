@@ -8,8 +8,27 @@ import { Loader2, LogOut, Clock } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import type { Doc } from "../../../convex/_generated/dataModel";
 
+import { INVITE_HINT_KEY } from "@/components/invite/InviteView";
+
+/** Porovná přihlášený e-mail s maskou `d****@domena` z pozvánky. */
+function emailMatchesMask(email: string | undefined, mask: string) {
+  if (!email) return false;
+  const [local, domain] = mask.split("@");
+  const lc = email.toLowerCase();
+  return lc.endsWith(`@${domain}`) && lc.startsWith(local.slice(0, 1).toLowerCase());
+}
+
 type Me = Doc<"users">;
-type MeCtx = { me: Me; isAdmin: boolean; canEdit: boolean };
+type MeCtx = {
+  me: Me;
+  isAdmin: boolean;
+  /** Smí editovat obsah (u role „restricted“ jen uvnitř jejích projektů — hlídá server). */
+  canEdit: boolean;
+  /** Role „Přiřazené projekty“ — vidí jen projekty, kde má vazbu. */
+  isRestricted: boolean;
+  /** Zakládat nové projekty smí jen admin a člen týmu. */
+  canCreateProject: boolean;
+};
 const MeContext = createContext<MeCtx | null>(null);
 
 /** Přihlášený uživatel + role. Použij jen uvnitř AuthGuard. */
@@ -27,6 +46,9 @@ export function AuthGuard({ children }: { children: ReactNode }) {
   const admins = useQuery(api.users.adminContacts, isSignedIn && me && me.status !== "active" ? {} : "skip");
   const ensure = useMutation(api.users.ensureCurrentUser);
   const ensured = useRef(false);
+  // Nápověda, když někdo otevřel pozvánku a pak se přihlásil jiným Google účtem.
+  // Čistě klientská, pozvánku nijak neuplatňuje.
+  const inviteHint = typeof window !== "undefined" ? sessionStorage.getItem(INVITE_HINT_KEY) : null;
 
   useEffect(() => {
     if (isLoaded && !isSignedIn) router.replace("/login");
@@ -65,6 +87,9 @@ export function AuthGuard({ children }: { children: ReactNode }) {
               ? <>Účet {user?.primaryEmailAddress?.emailAddress} byl administrátorem deaktivován.</>
               : <>Jsi přihlášen jako <b>{user?.primaryEmailAddress?.emailAddress}</b>, ale zatím nemáš žádná práva. Požádej administrátora o přiřazení role — byl už upozorněn.</>}
           </p>
+          {me.status === "pending" && inviteHint && !emailMatchesMask(user?.primaryEmailAddress?.emailAddress, inviteHint) && (
+            <p className="text-sm text-dl-overdue mb-2">Pozvánka byla pro <b>{inviteHint}</b> — odhlas se a přihlas tím účtem.</p>
+          )}
           {admins && admins.length > 0 && (
             <p className="text-sm text-a-text-3 mb-4">Administrátoři: {admins.map((a) => a.name ? `${a.name} (${a.email})` : a.email).join(", ")}</p>
           )}
@@ -80,7 +105,15 @@ export function AuthGuard({ children }: { children: ReactNode }) {
   }
 
   return (
-    <MeContext.Provider value={{ me, isAdmin: me.role === "admin", canEdit: me.role === "admin" || me.role === "member" }}>
+    <MeContext.Provider
+      value={{
+        me,
+        isAdmin: me.role === "admin",
+        canEdit: me.role !== "viewer",
+        isRestricted: me.role === "restricted",
+        canCreateProject: me.role === "admin" || me.role === "member",
+      }}
+    >
       {children}
     </MeContext.Provider>
   );

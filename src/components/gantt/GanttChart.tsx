@@ -8,7 +8,7 @@ import {
   type GanttFeature, type Range,
 } from "./kibo/gantt";
 import { STATUS_HEX, STATUS_LABEL, type Status, type Priority } from "@/lib/constants";
-import { formatDate, isoToDate, dateToISO } from "@/lib/dates";
+import { formatDate, isoToDate, dateToISO, todayISO } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 import { PriorityBadge, StatusBadge } from "@/components/shared/Badges";
 
@@ -26,14 +26,23 @@ type Item = GanttFeature & { kind: "project" | "subtask"; overdue: boolean; href
 
 export type GanttMoveEvent = { kind: "project" | "subtask"; id: string; startAt: Date; endAt: Date; hadStart: boolean; hadEnd: boolean; isLongTerm: boolean };
 
-/** Položka má termín, když má deadline (začátek se dopočítá) nebo obojí. Bez deadline → „Bez termínu“. */
+/**
+ * Položka má termín, když má deadline (začátek se dopočítá) nebo obojí. Bez deadline → „Bez termínu“.
+ * Výjimka: long-term projekt bez deadline se kreslí jako otevřený pruh (bez konce) od startu, jinak od dneška.
+ */
 function toFeature(kind: "project" | "subtask", id: string, name: string, status: Status, start?: string, end?: string, overdue = false, href = "", sub?: string, ownerLabel?: string, isLongTerm = false): Item | null {
+  const statusInfo = { id: status, name: STATUS_LABEL[status], color: STATUS_HEX[status] };
+  if (isLongTerm && !end) {
+    const startAt = isoToDate(start ?? todayISO());
+    // endAt je jen placeholder — pro openEnded ho Gantt ignoruje a táhne pruh na konec osy.
+    return { id, name, startAt, endAt: startAt, status: statusInfo, kind, overdue, href, sub, ownerLabel, hadStart: !!start, hadEnd: false, isLongTerm, openEnded: true };
+  }
   if (!end && !start) return null;
   const endAt = isoToDate(end ?? start!);
   let startAt = isoToDate(start ?? end!);
   if (!start) { startAt = new Date(endAt); startAt.setDate(startAt.getDate() - 1); } // bez začátku: 1denní značka u deadline
   if (startAt > endAt) startAt = new Date(endAt);
-  return { id, name, startAt, endAt, status: { id: status, name: STATUS_LABEL[status], color: STATUS_HEX[status] }, kind, overdue, href, sub, ownerLabel, hadStart: !!start, hadEnd: !!end, isLongTerm };
+  return { id, name, startAt, endAt, status: statusInfo, kind, overdue, href, sub, ownerLabel, hadStart: !!start, hadEnd: !!end, isLongTerm };
 }
 
 /** Odkaz, nebo jen span pokud jsou odkazy vypnuté (veřejný share). */
@@ -93,6 +102,7 @@ export function GanttChart({ projects, linkBase = "/projekty", onMove }: { proje
         <div className="ml-auto flex items-center gap-3 text-[11px] text-a-text-3">
           {(Object.keys(STATUS_HEX) as Status[]).map((s) => <span key={s} className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm" style={{ background: STATUS_HEX[s] }} /> {STATUS_LABEL[s]}</span>)}
           <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm overdue-hatch border border-dl-overdue" /> po termínu</span>
+          <span className="inline-flex items-center gap-1"><span className="h-2.5 w-4 rounded-sm bg-linear-to-r from-a-text-3 to-transparent" /> bez konce</span>
         </div>
         {onMove && <p className="w-full text-[11px] text-a-text-4">Tip: tažením pruhu posuneš termín, okraji pruhu změníš začátek / konec. Klik otevře detail.</p>}
       </div>
@@ -151,7 +161,7 @@ export function GanttChart({ projects, linkBase = "/projekty", onMove }: { proje
                             {(feature) => {
                               const it = feature as Item;
                               return (
-                                <Link href={it.href} className="flex-1 flex items-center gap-1.5 truncate text-xs" title={`${it.name} · ${it.status.name}${it.ownerLabel ? ` · ${it.ownerLabel}` : ""}`}>
+                                <Link href={it.href} className="flex-1 flex items-center gap-1.5 truncate text-xs" title={`${it.name} · ${it.status.name}${it.openEnded ? " · bez konce" : ""}${it.ownerLabel ? ` · ${it.ownerLabel}` : ""}`}>
                                   <span className={cn("h-full w-1 rounded-full shrink-0", it.overdue && "overdue-hatch")} style={{ background: it.status.color }} />
                                   {it.overdue && <AlertTriangle className="h-3 w-3 text-dl-overdue shrink-0" />}
                                   <span className={cn("truncate", it.kind === "project" && "font-semibold")}>{it.name}</span>

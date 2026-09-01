@@ -25,7 +25,8 @@ export const departmentValidator = v.union(
 
 export const phaseValidator = v.union(v.literal("not_started"), v.literal("in_progress"), v.literal("done"));
 
-export const roleValidator = v.union(v.literal("admin"), v.literal("member"), v.literal("viewer"));
+/** `restricted` = vidí jen projekty, kde má vazbu (owner / spolupracující / assignee subúkolu či contentu). */
+export const roleValidator = v.union(v.literal("admin"), v.literal("member"), v.literal("restricted"), v.literal("viewer"));
 
 export const linkValidator = v.object({ label: v.string(), url: v.string() });
 
@@ -193,6 +194,31 @@ export default defineSchema({
     revokedAt: v.optional(v.number()),
     lastUsedAt: v.optional(v.number()),
   }).index("by_token", ["token"]),
+
+  // Pozvánky nových uživatelů. Token v odkazu NEDÁVÁ přístup — je to jen
+  // ukazatel na landing stránku. Přístup uděluje výhradně shoda Googlem
+  // ověřeného e-mailu v `users.ensureCurrentUser`.
+  invites: defineTable({
+    email: v.string(), // vždy trim().toLowerCase()
+    token: v.string(),
+    role: roleValidator,
+    department: v.optional(departmentValidator),
+    projectIds: v.array(v.id("projects")), // po přijetí → collaboratorIds
+    note: v.optional(v.string()), // osobní vzkaz do e-mailu
+    invitedBy: v.id("users"),
+    createdAt: v.number(),
+    expiresAt: v.number(),
+    revokedAt: v.optional(v.number()),
+    acceptedAt: v.optional(v.number()),
+    acceptedUserId: v.optional(v.id("users")),
+    // stav doručení e-mailu — aby admin poznal, že odkaz musí poslat ručně
+    sendCount: v.number(),
+    lastSentAt: v.optional(v.number()),
+    lastSendStatus: v.optional(v.union(v.literal("sent"), v.literal("error"), v.literal("skipped"))),
+    lastSendError: v.optional(v.string()),
+  })
+    .index("by_token", ["token"])
+    .index("by_email", ["email"]),
 
   // Obecné key/value nastavení.
   settings: defineTable({

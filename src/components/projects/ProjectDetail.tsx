@@ -24,7 +24,7 @@ import { cn } from "@/lib/utils";
 export function ProjectDetail({ id }: { id: Id<"projects"> }) {
   const router = useRouter();
   const sp = useSearchParams();
-  const { canEdit, isAdmin } = useMe();
+  const { canEdit, isAdmin, isRestricted } = useMe();
   const project = useQuery(api.projects.get, { id });
   const activity = useQuery(api.activity.forProject, { projectId: id, limit: 40 });
   const setStatus = useMutation(api.projects.setStatus);
@@ -39,7 +39,15 @@ export function ProjectDetail({ id }: { id: Id<"projects"> }) {
   const selectedSubtask = sp.get("subtask") as Id<"subtasks"> | null;
 
   if (project === undefined) return <div className="text-a-text-3 text-sm">Načítám…</div>;
-  if (project === null) return <div className="text-a-text-3">Projekt nenalezen. <Link href="/projekty" className="text-a-accent-text">Zpět na portfolio</Link></div>;
+  if (project === null) {
+    // Pro omezenou roli je „nenalezen“ i projekt, ke kterému právě ztratila vazbu.
+    return (
+      <div className="text-a-text-3">
+        {isRestricted ? "K tomuto projektu už nemáš přístup." : "Projekt nenalezen."}{" "}
+        <Link href="/projekty" className="text-a-accent-text">Zpět na portfolio</Link>
+      </div>
+    );
+  }
 
   const editable = canEdit && !project.archivedAt;
   const s = project.stats;

@@ -10,7 +10,7 @@ import { ROLE_LABEL } from "@/lib/constants";
 import { UserAvatar } from "@/components/shared/UserAvatar";
 
 export function Header({ isDark, onToggleTheme }: { isDark: boolean; onToggleTheme: () => void }) {
-  const { me, canEdit } = useMe();
+  const { me, canCreateProject } = useMe();
   const { signOut } = useClerk();
   const router = useRouter();
 
@@ -20,7 +20,7 @@ export function Header({ isDark, onToggleTheme }: { isDark: boolean; onToggleThe
         <span className="text-xs font-semibold uppercase tracking-widest text-a-text-4 hidden sm:inline">DRONPRO · Řízení projektů</span>
       </div>
       <div className="flex items-center gap-2 md:gap-3">
-        {canEdit && (
+        {canCreateProject && (
           <Link
             href="/projekty/novy"
             className="inline-flex items-center gap-1.5 rounded-xl bg-accent-primary hover:bg-accent-hover text-white text-sm font-semibold px-3 py-2 transition-colors"

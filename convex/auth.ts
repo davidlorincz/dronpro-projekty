@@ -22,9 +22,17 @@ export async function requireUser(ctx: Ctx): Promise<Doc<"users">> {
   return user;
 }
 
-/** Admin nebo člen týmu — může vytvářet a editovat. */
+/**
+ * Admin nebo člen týmu — smí zakládat nové projekty.
+ * Pro editaci konkrétního projektu/subúkolu NEPOUŽÍVEJ — role `restricted` má
+ * plná práva uvnitř svých projektů; použij `requireProjectAccess` /
+ * `requireSubtaskAccess` z `access.ts`.
+ */
 export async function requireMember(ctx: Ctx): Promise<Doc<"users">> {
   const user = await requireUser(ctx);
+  if (user.role === "restricted") {
+    throw new ConvexError("Nové projekty může zakládat jen člen týmu nebo administrátor.");
+  }
   if (user.role !== "admin" && user.role !== "member") {
     throw new ConvexError("Máš pouze právo ke čtení.");
   }
@@ -41,6 +49,7 @@ export async function requireAdmin(ctx: Ctx): Promise<Doc<"users">> {
 export function isAdmin(user: Doc<"users"> | null | undefined) {
   return user?.role === "admin";
 }
+/** Smí editovat (restricted jen uvnitř svých projektů — hlídají guardy v `access.ts`). */
 export function canEdit(user: Doc<"users"> | null | undefined) {
-  return user?.role === "admin" || user?.role === "member";
+  return user?.role === "admin" || user?.role === "member" || user?.role === "restricted";
 }

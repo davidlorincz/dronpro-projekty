@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as access from "../access.js";
 import type * as activity from "../activity.js";
 import type * as auth from "../auth.js";
 import type * as content from "../content.js";
@@ -17,6 +18,7 @@ import type * as email from "../email.js";
 import type * as emailInternal from "../emailInternal.js";
 import type * as exportData from "../exportData.js";
 import type * as gantt from "../gantt.js";
+import type * as invites from "../invites.js";
 import type * as lib from "../lib.js";
 import type * as maintenance from "../maintenance.js";
 import type * as notificationTypes from "../notificationTypes.js";
@@ -35,6 +37,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  access: typeof access;
   activity: typeof activity;
   auth: typeof auth;
   content: typeof content;
@@ -44,6 +47,7 @@ declare const fullApi: ApiFromModules<{
   emailInternal: typeof emailInternal;
   exportData: typeof exportData;
   gantt: typeof gantt;
+  invites: typeof invites;
   lib: typeof lib;
   maintenance: typeof maintenance;
   notificationTypes: typeof notificationTypes;

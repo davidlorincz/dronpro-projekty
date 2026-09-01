@@ -6,7 +6,17 @@ export type Status = Doc<"projects">["status"];
 export type Priority = Doc<"projects">["priority"];
 export type DeadlineFlag = "overdue" | "soon" | "ok" | "done" | "missing" | "longterm";
 
-const DAY_MS = 86_400_000;
+export const DAY_MS = 86_400_000;
+
+/** Náhodný token pro veřejné odkazy (sdílené portfolio, pozvánky). */
+export function randomToken(len = 32) {
+  const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  let out = "";
+  const arr = new Uint8Array(len);
+  crypto.getRandomValues(arr);
+  for (const b of arr) out += chars[b % chars.length];
+  return out;
+}
 export const PRIORITY_ORDER: Record<Priority, number> = { top: 0, middle: 1, low: 2 };
 
 export function todayISO(): string {

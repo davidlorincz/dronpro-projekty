@@ -7,7 +7,9 @@ Next.js 16 App Router · React 19 · TypeScript · Convex 1.40 · Clerk v7 (Goog
 
 ## Struktura
 - `convex/schema.ts` — users, projects, subtasks, activity, notifications, shareLinks, settings, notificationLog
-- `convex/auth.ts` — `getCurrentUser / requireUser / requireMember / requireAdmin` (role: admin | member | viewer)
+- `convex/auth.ts` — `getCurrentUser / requireUser / requireMember / requireAdmin` (role: admin | member | restricted | viewer)
+- `convex/invites.ts` — pozvánky (token, expirace 14 dní, revoke/resend); uplatnění v `users.ensureCurrentUser`
+- `convex/access.ts` — viditelnost projektů: `projectScope / canSeeProject / filterVisible` + guardy `requireEditor / requireProjectAccess / requireSubtaskAccess / requireContentAccess`
 - `convex/lib.ts` — sdílené výpočty: progress, deadline flag, řazení (TOP→Low, pak nejbližší deadline)
 - `convex/projects.ts`, `subtasks.ts`, `dashboard.ts`, `gantt.ts`, `share.ts`, `activity.ts`, `notifications.ts`, `email.ts` ("use node"), `crons.ts`, `seed.ts`, `maintenance.ts` (interní CLI údržba)
 - `src/app/(app)/*` — přihlášená část (layout = `AppShell` s `AuthGuard`), `src/app/login`, `src/app/share/[token]` (veřejné)
@@ -23,6 +25,9 @@ Next.js 16 App Router · React 19 · TypeScript · Convex 1.40 · Clerk v7 (Goog
 - Progress = hotové / (všechny − cancelled); bez subúkolů = `null` („Bez subúkolů“). Hotové subúkoly projekt **neuzavírají** — jen banner „označit Finished“.
 - Blocked vždy vyžaduje `blockedReason` (validace na serveru).
 - Notifikace: vždy přes `notify()` v `convex/notifications.ts` — respektuje `users.notificationPrefs` (in-app / e-mail per typ, defaulty v `convex/notificationTypes.ts` = kopie `src/lib/notificationTypes.ts`, **měň obě**). Typy: assigned, blocked, due_soon, overdue, finish_suggest, deadline_changed (admin), new_user (admin). Globální kill-switch e-mailů: settings.emailNotifications.
+- Role `restricted` („Přiřazené projekty“) nevidí **žádný** projekt, dokud nezíská vazbu (owner / spolupracující / assignee subúkolu nebo contentu s `projectId`); pak vidí celý projekt a smí v něm editovat jako member, ale nezakládá nové projekty. Každá query nad projekty musí projít `filterVisible` a každá mutace nad konkrétním projektem `requireProjectAccess` / `requireSubtaskAccess` — proto `requireMember` v `projects.ts`/`subtasks.ts` **nepoužívej** (zůstává jen u `projects.create`).
+- Pozvánky: admin v /uzivatele zadá e-mail + roli + oddělení + projekty → token + e-mail přes Resend → `/pozvanka/<token>` (veřejná routa v `src/proxy.ts`). **Token v odkazu nedává přístup** — je to jen ukazatel na landing stránku; přístup uděluje výhradně shoda Googlem ověřeného e-mailu v `ensureCurrentUser`. Priorita při přihlášení: `INITIAL_ADMIN_EMAILS` > pozvánka > default `viewer/pending`. Pozvánka jen povyšuje, nikdy nesnižuje (adminovi roli nesebere, aktivnímu uživateli ji nepřepíše); projekty se přidávají do `collaboratorIds` aditivně.
+- `internal.email.send` má `transactional: true` pro pozvánky — obchází kill-switch `settings.emailNotifications`, který je určen pro notifikace, ne pro transakční e-maily. `cta` mění popisek tlačítka.
 - Nový uživatel = `status: "pending"` bez práv (hláška „požádej admina“), admin přidělí roli v /uzivatele. Bootstrap adminy určuje `INITIAL_ADMIN_EMAILS`.
 - Přihlášení jen přes Google (Clerk: e-mail kód i heslo vypnuty přes `clerk config patch`); u prod instance zopakovat.
 - Položky bez termínu se v Ganttu nevykreslují s umělým datem → sekce „Bez termínu“.

@@ -10,7 +10,7 @@ import {
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { ArrowUpDown, Download, Plus, AlertTriangle, ArchiveRestore, Trash2, Ban } from "lucide-react";
-import { DEPARTMENTS, PRIORITIES, PRIORITY_LABEL, STATUSES, STATUS_LABEL, type Priority, type Status } from "@/lib/constants";
+import { DEPARTMENTS, NO_ASSIGNED_PROJECTS, PRIORITIES, PRIORITY_LABEL, STATUSES, STATUS_LABEL, type Priority, type Status } from "@/lib/constants";
 import { FilterBar, FilterSelect, SearchInput, SegmentedControl, DateRange } from "@/components/admin/filters";
 import { useMe } from "@/components/layout/AuthGuard";
 import { DeadlineText, ProgressBar } from "@/components/shared/Badges";
@@ -29,7 +29,7 @@ type Row = NonNullable<ReturnType<typeof useQuery<typeof api.projects.list>>>[nu
 export function PortfolioView({ forcedScope }: { forcedScope?: Scope }) {
   const router = useRouter();
   const sp = useSearchParams();
-  const { canEdit, isAdmin } = useMe();
+  const { canEdit, isAdmin, isRestricted, canCreateProject } = useMe();
   const [scope, setScope] = useState<Scope>(forcedScope ?? ((sp.get("scope") as Scope) || "active"));
   const [search, setSearch] = useState("");
   const [owner, setOwner] = useState<string | undefined>(sp.get("owner") ?? undefined);
@@ -153,7 +153,7 @@ export function PortfolioView({ forcedScope }: { forcedScope?: Scope }) {
             className="inline-flex items-center gap-1.5 rounded-xl border border-a-border bg-a-surface px-3 py-2 text-sm text-a-text-2 hover:bg-a-hover cursor-pointer" disabled={!exportRows}>
             <Download className="h-4 w-4" /> Export CSV
           </button>
-          {canEdit && (
+          {canCreateProject && (
             <Link href="/projekty/novy" className="inline-flex items-center gap-1.5 rounded-xl bg-accent-primary hover:bg-accent-hover text-white text-sm font-semibold px-3 py-2">
               <Plus className="h-4 w-4" /> Nový projekt
             </Link>
@@ -195,7 +195,11 @@ export function PortfolioView({ forcedScope }: { forcedScope?: Scope }) {
           </thead>
           <tbody>
             {data === undefined && <tr><td colSpan={columns.length} className="px-3 py-8 text-center text-a-text-4">Načítám…</td></tr>}
-            {data && filtered.length === 0 && <tr><td colSpan={columns.length} className="px-3 py-8 text-center text-a-text-4">Žádné projekty neodpovídají filtru.</td></tr>}
+            {data && filtered.length === 0 && (
+              <tr><td colSpan={columns.length} className="px-3 py-8 text-center text-a-text-4">
+                {isRestricted && data.length === 0 ? NO_ASSIGNED_PROJECTS : "Žádné projekty neodpovídají filtru."}
+              </td></tr>
+            )}
             {table.getRowModel().rows.map((row) => (
               <tr key={row.id} className={cn(clickableRow, "border-b border-a-border-subtle last:border-0")} onClick={() => router.push(`/projekty/${row.original._id}`)}>
                 {row.getVisibleCells().map((cell) => (

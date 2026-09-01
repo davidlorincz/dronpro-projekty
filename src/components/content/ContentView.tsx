@@ -30,7 +30,7 @@ function monthRange(year: number, month: number) {
 }
 
 export function ContentView() {
-  const { canEdit } = useMe();
+  const { canEdit, isRestricted } = useMe();
   const now = new Date();
   const [ym, setYm] = useState({ year: now.getFullYear(), month: now.getMonth() });
   const [view, setView] = useState<"calendar" | "list">("calendar");
@@ -93,6 +93,8 @@ export function ContentView() {
 
         {data === undefined ? (
           <div className="px-4 pb-6 text-sm text-a-text-3">Načítám…</div>
+        ) : isRestricted && data.items.length === 0 && data.undated.length === 0 ? (
+          <div className="px-4 pb-6 text-sm text-a-text-4">Zatím ti nebyla přiřazena žádná položka contentu.</div>
         ) : view === "calendar" ? (
           <ContentCalendar
             year={ym.year} month={ym.month} items={items} editable={canEdit}

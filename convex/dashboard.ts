@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { query } from "./_generated/server";
 import { requireUser } from "./auth";
+import { filterVisible, projectScope } from "./access";
 import { departmentValidator } from "./schema";
 import {
   enrichProject,
@@ -24,7 +25,10 @@ export const overview = query({
     const today = todayISO();
     const userMap = await loadUserMap(ctx);
 
-    let projects = (await ctx.db.query("projects").collect()).filter((p) => !p.archivedAt);
+    let projects = filterVisible(
+      await projectScope(ctx, me),
+      (await ctx.db.query("projects").collect()).filter((p) => !p.archivedAt)
+    );
     if (args.department) projects = projects.filter((p) => p.department === args.department);
     if (args.ownerId) {
       projects = projects.filter(

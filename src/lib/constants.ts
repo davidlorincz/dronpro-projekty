@@ -80,11 +80,16 @@ export const PHASE_LABEL: Record<Phase, string> = {
   done: "Done",
 };
 
-export const ROLES = ["admin", "member", "viewer"] as const;
+/** Prázdný stav pro roli „Přiřazené projekty“ — odlišuje „nic ti nepřidělili“ od „filtr nic nenašel“. */
+export const NO_ASSIGNED_PROJECTS =
+  "Zatím ti nebyl přiřazen žádný projekt. Jakmile tě někdo přidá jako vlastníka, spolupracujícího nebo odpovědného za subúkol, objeví se tu.";
+
+export const ROLES = ["admin", "member", "restricted", "viewer"] as const;
 export type Role = (typeof ROLES)[number];
 export const ROLE_LABEL: Record<Role, string> = {
   admin: "Admin",
   member: "Člen týmu",
+  restricted: "Přiřazené projekty",
   viewer: "Pouze čtení",
 };
 

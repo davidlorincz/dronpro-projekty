@@ -70,6 +70,8 @@ export type GanttFeature = {
   endAt: Date;
   status: GanttStatus;
   lane?: string; // Optional: features with the same lane will share a row
+  /** Otevřený konec (long-term): `endAt` se ignoruje a pruh sahá na konec vykreslené osy. */
+  openEnded?: boolean;
 };
 
 export type GanttMarkerProps = {
@@ -859,11 +861,20 @@ export const GanttFeatureItem: FC<GanttFeatureItemProps> = ({
   useEffect(() => { setStartAt(feature.startAt); }, [feature.startAt]);
   useEffect(() => { setEndAt(feature.endAt); }, [feature.endAt]);
 
+  // Poslední den vykreslené osy. Když `handleScroll` připojí další rok, otevřený pruh se prodlouží s ním.
+  const timelineEndDate = useMemo(
+    () => new Date((gantt.timelineData.at(-1)?.year ?? new Date().getFullYear()) + 1, 0, 0),
+    [gantt.timelineData]
+  );
+
   // Memoize expensive calculations
   // Min. šířka, aby byly vidět i 1denní položky (milníky / jen deadline).
+  // Otevřený konec (long-term) ignoruje `endAt` a táhne se až na konec osy.
   const width = useMemo(
-    () => Math.max(getWidth(startAt, endAt, gantt), 28),
-    [startAt, endAt, gantt]
+    () => feature.openEnded
+      ? Math.max(getWidth(startAt, timelineEndDate, gantt), 28)
+      : Math.max(getWidth(startAt, endAt, gantt), 28),
+    [feature.openEnded, startAt, endAt, timelineEndDate, gantt]
   );
   const offset = useMemo(
     () => getOffset(startAt, timelineStartDate, gantt),
@@ -937,6 +948,13 @@ export const GanttFeatureItem: FC<GanttFeatureItemProps> = ({
           height: "calc(var(--gantt-row-height) - 4px)",
           width: Math.round(width),
           left: Math.round(offset),
+          // Otevřený konec: pravý okraj se vyšisuje → „pokračuje dál“.
+          ...(feature.openEnded
+            ? {
+                maskImage: "linear-gradient(to right, #000 calc(100% - 96px), transparent)",
+                WebkitMaskImage: "linear-gradient(to right, #000 calc(100% - 96px), transparent)",
+              }
+            : {}),
         }}
       >
         {onMove && (
@@ -966,7 +984,7 @@ export const GanttFeatureItem: FC<GanttFeatureItemProps> = ({
             )}
           </GanttFeatureItemCard>
         </DndContext>
-        {onMove && (
+        {onMove && !feature.openEnded && (
           <DndContext
             modifiers={[restrictToHorizontalAxis]}
             onDragEnd={onDragEnd}
@@ -1032,11 +1050,12 @@ export const GanttFeatureRow: FC<GanttFeatureRowProps> = ({
       subRow++;
     }
 
-    // Update the end time for this sub-row
+    // Update the end time for this sub-row (otevřený pruh obsadí sub-row „navždy“)
+    const effectiveEnd = feature.openEnded ? new Date(9999, 0, 1) : feature.endAt;
     if (subRow === subRowEndTimes.length) {
-      subRowEndTimes.push(feature.endAt);
+      subRowEndTimes.push(effectiveEnd);
     } else {
-      subRowEndTimes[subRow] = feature.endAt;
+      subRowEndTimes[subRow] = effectiveEnd;
     }
 
     featureWithPositions.push({ ...feature, subRow });

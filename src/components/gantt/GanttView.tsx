@@ -10,10 +10,10 @@ import { dateToISO } from "@/lib/dates";
 import { toast } from "@/lib/toast";
 import { errorToast } from "@/lib/convexError";
 import { FilterBar, FilterSelect } from "@/components/admin/filters";
-import { PRIORITIES, PRIORITY_LABEL } from "@/lib/constants";
+import { NO_ASSIGNED_PROJECTS, PRIORITIES, PRIORITY_LABEL } from "@/lib/constants";
 
 export function GanttView() {
-  const { canEdit } = useMe();
+  const { canEdit, isRestricted } = useMe();
   const updateProject = useMutation(api.projects.update);
   const updateSubtask = useMutation(api.subtasks.update);
   const users = useQuery(api.users.list) ?? [];
@@ -39,14 +39,16 @@ export function GanttView() {
 
   /**
    * Drag & drop v Ganttu → uložit termíny.
+   * - long-term projekt (otevřený pruh bez konce): mění se jen start
    * - položka bez původního startu: tažení těla posune jen deadline; levý úchyt nastaví start explicitně
-   * - long-term projekt (bez deadline): mění se jen start
    */
   const onMove = async (e: GanttMoveEvent) => {
     const start = dateToISO(e.startAt);
     const end = dateToISO(e.endAt);
     const patch: { startDate?: string; deadline?: string } = {};
-    if (e.hadStart) {
+    if (e.isLongTerm && !e.hadEnd) {
+      patch.startDate = start;
+    } else if (e.hadStart) {
       patch.startDate = start;
     } else {
       // původně jen deadline: pokud se levý okraj posunul jinam než na "den před deadlinem", uživatel chce start
@@ -72,7 +74,13 @@ export function GanttView() {
           <FilterSelect value={priority} onChange={setPriority} allLabel="Priorita" options={PRIORITIES.map((p) => ({ label: PRIORITY_LABEL[p], value: p }))} />
         </FilterBar>
       </div>
-      {full === undefined ? <div className="text-sm text-a-text-3">Načítám…</div> : <GanttChart projects={data} onMove={canEdit ? onMove : undefined} />}
+      {full === undefined ? (
+        <div className="text-sm text-a-text-3">Načítám…</div>
+      ) : isRestricted && full.length === 0 ? (
+        <div className="card p-8 text-center text-sm text-a-text-4">{NO_ASSIGNED_PROJECTS}</div>
+      ) : (
+        <GanttChart projects={data} onMove={canEdit ? onMove : undefined} />
+      )}
     </div>
   );
 }

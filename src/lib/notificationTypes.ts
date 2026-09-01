@@ -9,6 +9,7 @@ export const NOTIFICATION_TYPES = [
   { key: "finish_suggest", label: "Vše hotovo — nabídka Finished", desc: "Všechny subúkoly projektu, který vlastníš, jsou hotové.", adminOnly: false, defaults: { inApp: true, email: false } },
   { key: "deadline_changed", label: "Člen změnil termín", desc: "Člen týmu změnil deadline nebo začátek projektu / subúkolu.", adminOnly: true, defaults: { inApp: true, email: true } },
   { key: "new_user", label: "Nový uživatel čeká na práva", desc: "Někdo se poprvé přihlásil a čeká na přidělení role.", adminOnly: true, defaults: { inApp: true, email: true } },
+  { key: "invite_accepted", label: "Pozvánka přijata", desc: "Pozvaný uživatel se přihlásil a získal přidělenou roli.", adminOnly: true, defaults: { inApp: true, email: false } },
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number]["key"];

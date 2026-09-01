@@ -11,6 +11,7 @@ import { toast } from "@/lib/toast";
 import { formatDateTime } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
+import { InvitesSection } from "./InvitesSection";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Trash2 } from "lucide-react";
 
@@ -32,7 +33,10 @@ export function UsersView() {
       <div>
         <h1 className="text-2xl">Uživatelé</h1>
         <p className="text-sm text-a-text-3">Kdo se přihlásí Google účtem, se tu objeví jako <b>čekající</b> bez jakýchkoli práv. Přístup získá až přidělením role. Přístup lze kdykoli deaktivovat.</p>
+        <p className="text-sm text-a-text-3"><b>Přiřazené projekty</b> = uživatel nevidí nic, dokud mu někoho nepřiřadíš — pak vidí celý projekt, kde je vlastník, spolupracující, odpovědný za subúkol nebo přiřazený u contentu, a smí v něm editovat.</p>
       </div>
+      <InvitesSection />
+
       {users?.some((u) => u.status === "pending") && (
         <div className="rounded-xl border border-amber-300/60 bg-st-waiting-bg px-4 py-3 text-sm">
           <div className="font-semibold text-st-waiting-text mb-1">Čeká na přidělení práv</div>

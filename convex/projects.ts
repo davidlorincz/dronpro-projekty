@@ -3,6 +3,7 @@ import { mutation, query } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { requireAdmin, requireMember, requireUser } from "./auth";
+import { canSeeProject, filterVisible, projectScope, requireProjectAccess } from "./access";
 import {
   departmentValidator,
   linkValidator,
@@ -45,7 +46,8 @@ export const list = query({
     search: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    await requireUser(ctx);
+    const me = await requireUser(ctx);
+    const access = await projectScope(ctx, me);
     const scope = args.scope ?? "active";
     let projects: Doc<"projects">[];
     if (args.search && args.search.trim()) {
@@ -56,6 +58,7 @@ export const list = query({
     } else {
       projects = await ctx.db.query("projects").collect();
     }
+    projects = filterVisible(access, projects); // před načtením subúkolů, ať se netahají zbytečně
     projects = projects.filter((p) => {
       if (scope === "all") return true;
       if (scope === "archived") return !!p.archivedAt;
@@ -79,9 +82,10 @@ export const list = query({
 export const get = query({
   args: { id: v.id("projects") },
   handler: async (ctx, args) => {
-    await requireUser(ctx);
+    const me = await requireUser(ctx);
     const p = await ctx.db.get(args.id);
-    if (!p) return null;
+    // Mimo scope se tváříme stejně jako „neexistuje“ — frontend na to má hlášku.
+    if (!p || !canSeeProject(await projectScope(ctx, me), p._id)) return null;
     const userMap = await loadUserMap(ctx);
     const subtasks = await ctx.db
       .query("subtasks")
@@ -105,8 +109,8 @@ export const get = query({
 export const options = query({
   args: {},
   handler: async (ctx) => {
-    await requireUser(ctx);
-    const rows = await ctx.db.query("projects").collect();
+    const me = await requireUser(ctx);
+    const rows = filterVisible(await projectScope(ctx, me), await ctx.db.query("projects").collect());
     return rows
       .filter((p) => !p.archivedAt)
       .map((p) => ({ _id: p._id, name: p.name, priority: p.priority, status: p.status }))
@@ -246,9 +250,7 @@ export const update = mutation({
     }),
   },
   handler: async (ctx, args) => {
-    const me = await requireMember(ctx);
-    const before = await ctx.db.get(args.id);
-    if (!before) throw new ConvexError("Projekt nenalezen.");
+    const { me, project: before } = await requireProjectAccess(ctx, args.id);
     // null = vymazat pole (Convex `undefined` v argumentech zahazuje)
     const patch: Record<string, unknown> = {};
     for (const [k, val] of Object.entries(args.patch)) patch[k] = val === null ? undefined : val;
@@ -266,9 +268,7 @@ export const update = mutation({
 export const setStatus = mutation({
   args: { id: v.id("projects"), status: statusValidator, blockedReason: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const me = await requireMember(ctx);
-    const before = await ctx.db.get(args.id);
-    if (!before) throw new ConvexError("Projekt nenalezen.");
+    const { me, project: before } = await requireProjectAccess(ctx, args.id);
     if (args.status === "blocked" && !args.blockedReason?.trim()) {
       throw new ConvexError("U stavu Blocked vyplň důvod blokace.");
     }
@@ -282,9 +282,7 @@ export const setStatus = mutation({
 export const setPriority = mutation({
   args: { id: v.id("projects"), priority: priorityValidator },
   handler: async (ctx, args) => {
-    const me = await requireMember(ctx);
-    const before = await ctx.db.get(args.id);
-    if (!before) throw new ConvexError("Projekt nenalezen.");
+    const { me, project: before } = await requireProjectAccess(ctx, args.id);
     await diffAndLog(ctx, me, before, { priority: args.priority });
     await ctx.db.patch(args.id, { priority: args.priority, updatedAt: Date.now() });
   },
@@ -293,9 +291,7 @@ export const setPriority = mutation({
 export const archive = mutation({
   args: { id: v.id("projects") },
   handler: async (ctx, args) => {
-    const me = await requireMember(ctx);
-    const p = await ctx.db.get(args.id);
-    if (!p) throw new ConvexError("Projekt nenalezen.");
+    const { me, project: p } = await requireProjectAccess(ctx, args.id);
     await ctx.db.patch(args.id, { archivedAt: Date.now(), updatedAt: Date.now() });
     await logActivity(ctx, {
       entityType: "project", entityId: p._id, projectId: p._id, userId: me._id,
@@ -307,9 +303,7 @@ export const archive = mutation({
 export const restore = mutation({
   args: { id: v.id("projects") },
   handler: async (ctx, args) => {
-    const me = await requireMember(ctx);
-    const p = await ctx.db.get(args.id);
-    if (!p) throw new ConvexError("Projekt nenalezen.");
+    const { me, project: p } = await requireProjectAccess(ctx, args.id);
     await ctx.db.patch(args.id, { archivedAt: undefined, updatedAt: Date.now() });
     await logActivity(ctx, {
       entityType: "project", entityId: p._id, projectId: p._id, userId: me._id,
@@ -338,9 +332,7 @@ export const hardDelete = mutation({
 export const activateFromBacklog = mutation({
   args: { id: v.id("projects"), startDate: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const me = await requireMember(ctx);
-    const p = await ctx.db.get(args.id);
-    if (!p) throw new ConvexError("Projekt nenalezen.");
+    const { me, project: p } = await requireProjectAccess(ctx, args.id);
     const patch = { isBacklog: false, startDate: args.startDate ?? p.startDate ?? todayISO() };
     await diffAndLog(ctx, me, p, patch);
     await ctx.db.patch(p._id, { ...patch, updatedAt: Date.now() });

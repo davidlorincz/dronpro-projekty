@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
+import { roleValidator } from "./schema";
 
 /** Údržba z CLI: `npx convex run maintenance:removeUserByEmail '{"email":"..."}'` */
 export const removeUserByEmail = internalMutation({
@@ -82,7 +83,7 @@ export const seedProjectDates = internalMutation({
 
 /** Ruční oprava záznamu uživatele podle clerkId (role/e-mail/jméno). */
 export const fixUser = internalMutation({
-  args: { clerkId: v.string(), email: v.optional(v.string()), name: v.optional(v.string()), avatarUrl: v.optional(v.string()), role: v.optional(v.union(v.literal("admin"), v.literal("member"), v.literal("viewer"))) },
+  args: { clerkId: v.string(), email: v.optional(v.string()), name: v.optional(v.string()), avatarUrl: v.optional(v.string()), role: v.optional(roleValidator) },
   handler: async (ctx, args) => {
     const u = await ctx.db.query("users").withIndex("by_clerkId", (q) => q.eq("clerkId", args.clerkId)).first();
     if (!u) return "not found";

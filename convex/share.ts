@@ -1,21 +1,13 @@
 import { v, ConvexError } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { requireAdmin, requireUser } from "./auth";
-import { enrichProject, enrichSubtask, loadSubtasksByProject, loadUserMap, sortProjects, todayISO } from "./lib";
-
-function randomToken(len = 32) {
-  const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  let out = "";
-  const arr = new Uint8Array(len);
-  crypto.getRandomValues(arr);
-  for (const b of arr) out += chars[b % chars.length];
-  return out;
-}
+import { requireAdmin } from "./auth";
+import { enrichProject, enrichSubtask, loadSubtasksByProject, loadUserMap, randomToken, sortProjects, todayISO } from "./lib";
 
 export const list = query({
   args: {},
   handler: async (ctx) => {
-    await requireUser(ctx);
+    // Jen admin — token ve výpisu by komukoli umožnil obejít omezení viditelnosti přes /share/<token>.
+    await requireAdmin(ctx);
     const rows = await ctx.db.query("shareLinks").collect();
     const users = await loadUserMap(ctx);
     return rows

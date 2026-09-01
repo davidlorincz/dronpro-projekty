@@ -1,8 +1,9 @@
 import { v, ConvexError } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import type { Doc } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
-import { requireAdmin, requireMember, requireUser } from "./auth";
+import { requireAdmin, requireUser } from "./auth";
+import { requireProjectAccess, requireSubtaskAccess } from "./access";
 import { linkValidator, phaseValidator, priorityValidator, statusValidator, todoValidator } from "./schema";
 import { logActivity, fieldLabel } from "./activity";
 import { notify, notifyAdmins } from "./notifications";
@@ -76,9 +77,7 @@ export const create = mutation({
     todos: v.optional(v.array(todoValidator)),
   },
   handler: async (ctx, args) => {
-    const me = await requireMember(ctx);
-    const project = await ctx.db.get(args.projectId);
-    if (!project) throw new ConvexError("Projekt nenalezen.");
+    const { me, project } = await requireProjectAccess(ctx, args.projectId);
     const status = args.status ?? "not_started";
     validate({ title: args.title, status, blockedReason: args.blockedReason, startDate: args.startDate, deadline: args.deadline });
     const siblings = await ctx.db.query("subtasks").withIndex("by_project", (q) => q.eq("projectId", args.projectId)).collect();
@@ -198,13 +197,17 @@ export const update = mutation({
     }),
   },
   handler: async (ctx, args) => {
-    const me = await requireMember(ctx);
-    const before = await ctx.db.get(args.id);
-    if (!before) throw new ConvexError("Subúkol nenalezen.");
+    const { me, subtask: before } = await requireSubtaskAccess(ctx, args.id);
     const patch: Record<string, unknown> = {};
     for (const [k, val] of Object.entries(args.patch)) patch[k] = val === null ? undefined : val;
     if (typeof patch.title === "string") patch.title = patch.title.trim();
     if (patch.dependsOn && patch.dependsOn === before._id) throw new ConvexError("Subúkol nemůže záviset sám na sobě.");
+    if (patch.dependsOn) {
+      const target = await ctx.db.get(patch.dependsOn as Id<"subtasks">);
+      if (!target || target.projectId !== before.projectId) {
+        throw new ConvexError("Závislost musí být subúkol ze stejného projektu.");
+      }
+    }
     const merged = { ...before, ...patch } as Doc<"subtasks">;
     validate(merged);
     if (patch.status && patch.status !== "blocked" && before.status === "blocked" && !("blockedReason" in patch)) {
@@ -219,9 +222,7 @@ export const update = mutation({
 export const setStatus = mutation({
   args: { id: v.id("subtasks"), status: statusValidator, blockedReason: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const me = await requireMember(ctx);
-    const before = await ctx.db.get(args.id);
-    if (!before) throw new ConvexError("Subúkol nenalezen.");
+    const { me, subtask: before } = await requireSubtaskAccess(ctx, args.id);
     if (args.status === "blocked" && !args.blockedReason?.trim()) throw new ConvexError("U stavu Blocked vyplň důvod blokace.");
     const patch: Record<string, unknown> = { status: args.status, blockedReason: args.status === "blocked" ? args.blockedReason : undefined };
     await diffAndLog(ctx, me, before, patch);
@@ -233,7 +234,7 @@ export const setStatus = mutation({
 export const reorder = mutation({
   args: { projectId: v.id("projects"), orderedIds: v.array(v.id("subtasks")) },
   handler: async (ctx, args) => {
-    await requireMember(ctx);
+    await requireProjectAccess(ctx, args.projectId);
     for (let i = 0; i < args.orderedIds.length; i++) {
       const s = await ctx.db.get(args.orderedIds[i]);
       if (s && s.projectId === args.projectId && s.order !== i + 1) await ctx.db.patch(s._id, { order: i + 1 });
@@ -244,9 +245,7 @@ export const reorder = mutation({
 export const archive = mutation({
   args: { id: v.id("subtasks") },
   handler: async (ctx, args) => {
-    const me = await requireMember(ctx);
-    const s = await ctx.db.get(args.id);
-    if (!s) throw new ConvexError("Subúkol nenalezen.");
+    const { me, subtask: s } = await requireSubtaskAccess(ctx, args.id);
     await ctx.db.patch(s._id, { archivedAt: Date.now(), updatedAt: Date.now() });
     await ctx.db.patch(s.projectId, { updatedAt: Date.now() });
     await logActivity(ctx, { entityType: "subtask", entityId: s._id, projectId: s.projectId, userId: me._id, action: "archived", message: `Subúkol „${s.title}“ archivován` });
@@ -256,9 +255,7 @@ export const archive = mutation({
 export const restore = mutation({
   args: { id: v.id("subtasks") },
   handler: async (ctx, args) => {
-    const me = await requireMember(ctx);
-    const s = await ctx.db.get(args.id);
-    if (!s) throw new ConvexError("Subúkol nenalezen.");
+    const { me, subtask: s } = await requireSubtaskAccess(ctx, args.id);
     await ctx.db.patch(s._id, { archivedAt: undefined, updatedAt: Date.now() });
     await logActivity(ctx, { entityType: "subtask", entityId: s._id, projectId: s.projectId, userId: me._id, action: "restored", message: `Subúkol „${s.title}“ obnoven` });
   },

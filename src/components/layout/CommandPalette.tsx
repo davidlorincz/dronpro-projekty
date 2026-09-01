@@ -7,21 +7,27 @@ import { api } from "../../../convex/_generated/api";
 import { Search, LayoutDashboard, FolderKanban, GanttChartSquare, Users, Settings, CornerDownLeft, Archive, Plus, CalendarDays } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { PRIORITY_LABEL, STATUS_LABEL } from "@/lib/constants";
+import { useMe } from "./AuthGuard";
 
-type NavItem = { label: string; href: string; icon: LucideIcon };
+type NavItem = { label: string; href: string; icon: LucideIcon; adminOnly?: boolean; needsCreate?: boolean };
 const NAV: NavItem[] = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard },
   { label: "Portfolio projektů", href: "/projekty", icon: FolderKanban },
-  { label: "Nový projekt", href: "/projekty/novy", icon: Plus },
+  { label: "Nový projekt", href: "/projekty/novy", icon: Plus, needsCreate: true },
   { label: "Gantt", href: "/gantt", icon: GanttChartSquare },
   { label: "Content plán", href: "/content", icon: CalendarDays },
   { label: "Archiv", href: "/archiv", icon: Archive },
-  { label: "Uživatelé", href: "/uzivatele", icon: Users },
-  { label: "Nastavení", href: "/nastaveni", icon: Settings },
+  { label: "Uživatelé", href: "/uzivatele", icon: Users, adminOnly: true },
+  { label: "Nastavení", href: "/nastaveni", icon: Settings, adminOnly: true },
 ];
 
 export function CommandPalette() {
   const router = useRouter();
+  const { isAdmin, canCreateProject } = useMe();
+  const nav = useMemo(
+    () => NAV.filter((n) => (!n.adminOnly || isAdmin) && (!n.needsCreate || canCreateProject)),
+    [isAdmin, canCreateProject]
+  );
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [idx, setIdx] = useState(0);
@@ -38,13 +44,13 @@ export function CommandPalette() {
 
   const results = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    const nav = NAV.filter((n) => !needle || n.label.toLowerCase().includes(needle)).map((n) => ({ ...n, kind: "nav" as const, sub: "" }));
+    const navItems = nav.filter((n) => !needle || n.label.toLowerCase().includes(needle)).map((n) => ({ ...n, kind: "nav" as const, sub: "" }));
     const projs = (projects ?? [])
       .filter((p) => needle && p.name.toLowerCase().includes(needle))
       .slice(0, 8)
       .map((p) => ({ label: p.name, href: `/projekty/${p._id}`, icon: FolderKanban, kind: "project" as const, sub: `${PRIORITY_LABEL[p.priority]} · ${STATUS_LABEL[p.status]}` }));
-    return [...projs, ...nav];
-  }, [q, projects]);
+    return [...projs, ...navItems];
+  }, [q, projects, nav]);
 
 
   if (!open) return null;

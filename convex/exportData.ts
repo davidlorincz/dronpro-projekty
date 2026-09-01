@@ -1,15 +1,19 @@
 import { query } from "./_generated/server";
 import { requireUser } from "./auth";
+import { filterVisible, projectScope } from "./access";
 import { enrichProject, loadSubtasksByProject, loadUserMap, sortProjects, todayISO } from "./lib";
 
 /** Ploché řádky pro CSV/Excel export — projekty i subúkoly. */
 export const rows = query({
   args: {},
   handler: async (ctx) => {
-    await requireUser(ctx);
+    const me = await requireUser(ctx);
     const today = todayISO();
     const userMap = await loadUserMap(ctx);
-    const projects = (await ctx.db.query("projects").collect()).filter((p) => !p.archivedAt);
+    const projects = filterVisible(
+      await projectScope(ctx, me),
+      (await ctx.db.query("projects").collect()).filter((p) => !p.archivedAt)
+    );
     const subMap = await loadSubtasksByProject(ctx, projects.map((p) => p._id));
     const enriched = sortProjects(projects.map((p) => enrichProject(p, subMap.get(p._id) ?? [], userMap, today)));
     const name = (id: string) => userMap.get(id as never)?.name ?? userMap.get(id as never)?.email ?? "";

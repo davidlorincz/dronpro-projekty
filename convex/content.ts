@@ -1,7 +1,8 @@
 import { v, ConvexError } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { requireMember, requireUser } from "./auth";
+import { requireUser } from "./auth";
+import { projectScope, requireContentAccess, requireEditor, requireProjectAccess } from "./access";
 import { channelValidator, contentStatusValidator, linkValidator } from "./schema";
 import { notify } from "./notifications";
 import { loadUserMap, type UserLite } from "./lib";
@@ -19,8 +20,11 @@ const nullable = <T extends import("convex/values").Validator<any, "required", a
 export const list = query({
   args: { from: v.string(), to: v.string() },
   handler: async (ctx, args) => {
-    await requireUser(ctx);
-    const all = await ctx.db.query("contentItems").collect();
+    const me = await requireUser(ctx);
+    const access = await projectScope(ctx, me);
+    let all = await ctx.db.query("contentItems").collect();
+    // restricted vidí jen položky, kde je přiřazený, nebo které patří k jeho projektu
+    if (access) all = all.filter((i) => i.assigneeIds.includes(me._id) || (!!i.projectId && access.has(i.projectId)));
     const userMap = await loadUserMap(ctx);
     const projectIds = [...new Set(all.map((i) => i.projectId).filter(Boolean))] as Id<"projects">[];
     const projects = await Promise.all(projectIds.map((id) => ctx.db.get(id)));
@@ -63,7 +67,8 @@ const contentFields = {
 export const create = mutation({
   args: contentFields,
   handler: async (ctx, args) => {
-    const me = await requireMember(ctx);
+    const me = await requireEditor(ctx);
+    if (args.projectId) await requireProjectAccess(ctx, args.projectId);
     if (!args.title.trim()) throw new ConvexError("Název je povinný.");
     const id = await ctx.db.insert("contentItems", {
       title: args.title.trim(),
@@ -103,9 +108,8 @@ export const update = mutation({
     }),
   },
   handler: async (ctx, args) => {
-    const me = await requireMember(ctx);
-    const before = await ctx.db.get(args.id);
-    if (!before) throw new ConvexError("Položka nenalezena.");
+    const { me, item: before } = await requireContentAccess(ctx, args.id);
+    if (args.patch.projectId) await requireProjectAccess(ctx, args.patch.projectId);
     const patch: Record<string, unknown> = {};
     for (const [k, val] of Object.entries(args.patch)) patch[k] = val === null ? undefined : val;
     if (typeof patch.title === "string") {
@@ -129,9 +133,7 @@ export const update = mutation({
 export const setStatus = mutation({
   args: { id: v.id("contentItems"), status: contentStatusValidator },
   handler: async (ctx, args) => {
-    await requireMember(ctx);
-    const item = await ctx.db.get(args.id);
-    if (!item) throw new ConvexError("Položka nenalezena.");
+    await requireContentAccess(ctx, args.id);
     await ctx.db.patch(args.id, { status: args.status, updatedAt: Date.now() });
   },
 });
@@ -139,9 +141,7 @@ export const setStatus = mutation({
 export const archive = mutation({
   args: { id: v.id("contentItems") },
   handler: async (ctx, args) => {
-    await requireMember(ctx);
-    const item = await ctx.db.get(args.id);
-    if (!item) throw new ConvexError("Položka nenalezena.");
+    await requireContentAccess(ctx, args.id);
     await ctx.db.patch(args.id, { archivedAt: Date.now(), updatedAt: Date.now() });
   },
 });
@@ -149,9 +149,7 @@ export const archive = mutation({
 export const restore = mutation({
   args: { id: v.id("contentItems") },
   handler: async (ctx, args) => {
-    await requireMember(ctx);
-    const item = await ctx.db.get(args.id);
-    if (!item) throw new ConvexError("Položka nenalezena.");
+    await requireContentAccess(ctx, args.id);
     await ctx.db.patch(args.id, { archivedAt: undefined, updatedAt: Date.now() });
   },
 });

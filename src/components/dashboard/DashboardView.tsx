@@ -6,7 +6,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { AlertTriangle, Ban, CalendarClock, Clock, FolderKanban, Inbox, Star, UserX, CheckCircle2, ListTodo } from "lucide-react";
-import { DEPARTMENTS, type Department } from "@/lib/constants";
+import { DEPARTMENTS, NO_ASSIGNED_PROJECTS, type Department } from "@/lib/constants";
 import { FilterBar, FilterSelect } from "@/components/admin/filters";
 import { useMe } from "@/components/layout/AuthGuard";
 import { DeadlineText, PriorityBadge, ProgressBar, StatusBadge } from "@/components/shared/Badges";
@@ -85,7 +85,7 @@ function Section({ title, icon: Icon, count, children, tone, defaultOpen = true 
 }
 
 export function DashboardView() {
-  const { me, canEdit } = useMe();
+  const { me, canEdit, isRestricted } = useMe();
   const [department, setDepartment] = useState<string | undefined>();
   const [ownerId, setOwnerId] = useState<string | undefined>();
   const users = useQuery(api.users.list) ?? [];
@@ -111,6 +111,10 @@ export function DashboardView() {
           <FilterSelect value={ownerId} onChange={setOwnerId} allLabel="Všichni vlastníci" options={users.map((u) => ({ label: u.name ?? u.email, value: u._id }))} />
         </FilterBar>
       </div>
+
+      {isRestricted && data.counts.active === 0 && data.backlog.length === 0 && (
+        <div className="card p-6 text-center text-sm text-a-text-3">{NO_ASSIGNED_PROJECTS}</div>
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <StatTile label="Aktivních projektů" value={data.counts.active} icon={FolderKanban} tone="bg-a-accent-bg text-a-accent-text" href="/projekty" />

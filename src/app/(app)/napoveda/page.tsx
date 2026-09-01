@@ -28,8 +28,10 @@ export default function HelpPage() {
         <ul className="list-disc pl-5 space-y-1">
           <li><b>Admin</b> — správa uživatelů, nastavení, definitivní mazání, vše ostatní.</li>
           <li><b>Člen týmu</b> — zakládá a edituje projekty i subúkoly, mění stavy.</li>
+          <li><b>Přiřazené projekty</b> — vidí jen projekty, kde je vlastník, spolupracující, odpovědný za subúkol nebo přiřazený u contentu. Uvnitř nich má plná práva, nové projekty ale nezakládá. Odebráním poslední vazby přístup k projektu zaniká.</li>
           <li><b>Pouze čtení</b> — vidí vše, nemění nic. Pro externí: sdílený odkaz v Nastavení.</li>
-          <li>Nový uživatel po přihlášení Googlem <b>nemá žádná práva</b>, dokud mu admin v Uživatelích nepřidělí roli (admin dostane upozornění).</li>
+          <li><b>Pozvánky</b> — admin v Uživatelích zadá e-mail, roli, oddělení a projekty; pozvanému přijde odkaz a po přihlášení Googlem je rovnou uvnitř s přidělenou rolí. Pozvánka platí 14 dní a uplatní se jen pro účet se <b>stejným e-mailem</b>. Odkaz sám o sobě přístup nedává.</li>
+          <li>Nový uživatel bez pozvánky <b>nemá po přihlášení Googlem žádná práva</b>, dokud mu admin v Uživatelích nepřidělí roli (admin dostane upozornění).</li>
           <li><b>Moje notifikace</b> — každý si zvolí, které události chce a jestli v aplikaci nebo e-mailem.</li>
         </ul>
         <p className="text-xs text-a-text-4">Zkratka ⌘K / Ctrl+K otevře rychlé hledání.</p>
