@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
-import { formatCZK } from "@/lib/constants";
+import { EVENT_MAIN_COST_LABEL, formatCZK, type EventKind } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { newId } from "./PackList";
 
@@ -20,8 +20,9 @@ export type CostItem = { id: string; label: string; amount: number };
 export type CostPatch = { boothPrice?: number | null; costs?: CostItem[]; revenue?: number | null };
 
 export function CostEditor({
-  boothPrice, costs, revenue, onPatch, disabled, showRevenue = true,
+  kind, boothPrice, costs, revenue, onPatch, disabled, showRevenue = true,
 }: {
+  kind: EventKind;
   boothPrice?: number;
   costs: CostItem[];
   revenue?: number;
@@ -58,7 +59,7 @@ export function CostEditor({
       <div className="font-semibold">Finance</div>
 
       <div className="flex items-center justify-between gap-3 text-sm">
-        <span className="text-a-text-2">Cena stánku</span>
+        <span className="text-a-text-2">{EVENT_MAIN_COST_LABEL[kind]}</span>
         <input
           type="text" inputMode="numeric" disabled={disabled}
           defaultValue={boothPrice ?? ""}
@@ -93,7 +94,7 @@ export function CostEditor({
           <input
             value={label} onChange={(e) => setLabel(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }}
-            placeholder="Další náklad (doprava, tisk…)"
+            placeholder={kind === "event" ? "Další náklad (doprava, tisk…)" : "Další náklad (doprava, technika…)"}
             className="flex-1 rounded-lg border border-a-border bg-a-input px-2 py-1.5 text-sm outline-none focus:border-cyan-500"
           />
           <input

@@ -18,7 +18,7 @@ export default function HelpPage() {
           <li><b>Eventy</b> (veletrhy, konference) a <b>Zakázky</b> (klientské dodávky) fungují úplně stejně — jen jsou ve dvou sekcích. Řadí se od nejbližšího termínu.</li>
           <li><b>Stavy</b>: Nezačato → Probíhá příprava → <b>Ready to go</b> (vše nachystáno, můžeme vyrazit) → Hotovo.</li>
           <li><b>Vychystávka</b> — Materiál, Vybavení a Check list jsou tři seznamy a zároveň odškrtávátka. Počítadlo „x/y nachystáno“ vidíš i ve výpisu, takže před odjezdem je hned jasné, co chybí.</li>
-          <li><b>Finance</b> — cena stánku zvlášť, ostatní náklady jako jednotlivé položky a k tomu fakturovaná částka; nástroj dopočítá celkové náklady a hrubý zisk.</li>
+          <li><b>Finance</b> — hlavní náklad zvlášť (u eventu cena stánku, u zakázky fixní náklad jako lokace nebo povolení), ostatní náklady jako jednotlivé položky a k tomu fakturovaná částka; nástroj dopočítá celkové náklady a hrubý zisk.</li>
           <li><b>Dokumenty a fotky</b> — smlouvy a objednávky přetáhni přímo do akce (max 20 MB na soubor). Fotky se při nahrání automaticky zmenší. Na velké fotogalerie použij radši odkaz na Disk — úložiště appky je omezené.</li>
           <li><b>Kalendář</b> — eventy i zakázky v jednom měsíčním přehledu kvůli kapacitám. Vícedenní akce se táhne přes celý svůj rozsah, barva rozlišuje event od zakázky a tečka ukazuje stav. Klik do dne založí novou akci k tomu datu.</li>
           <li>Kdo je <b>event manažer</b> nebo v týmu, dostane upozornění při přiřazení a připomínku 7 dní před akcí.</li>

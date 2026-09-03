@@ -145,6 +145,8 @@ export const EVENT_KIND_LABEL: Record<EventKind, string> = { event: "Event", job
 export const EVENT_KIND_PLURAL: Record<EventKind, string> = { event: "Eventy", job: "Zakázky" };
 export const EVENT_KIND_NEW: Record<EventKind, string> = { event: "Nový event", job: "Nová zakázka" };
 export const EVENT_KIND_PATH: Record<EventKind, string> = { event: "/eventy", job: "/zakazky" };
+/** Hlavní náklad vedený zvlášť: u eventu stánek, u zakázky jakýkoli fixní výdaj (lokace, povolení). */
+export const EVENT_MAIN_COST_LABEL: Record<EventKind, string> = { event: "Cena stánku", job: "Fixní náklad" };
 export const EVENT_KIND_CLASS: Record<EventKind, string> = {
   event: "bg-ev-event-bg text-ev-event-text",
   job: "bg-ev-job-bg text-ev-job-text",

@@ -187,7 +187,7 @@ export function EventDetail({ id, kind }: { id: Id<"events">; kind: EventKind })
 
           <div className="card p-4">
             <CostEditor
-              boothPrice={e.boothPrice} costs={e.costs} revenue={e.revenue} disabled={!editable}
+              kind={kind} boothPrice={e.boothPrice} costs={e.costs} revenue={e.revenue} disabled={!editable}
               onPatch={(p) => void patch(p)}
             />
           </div>
