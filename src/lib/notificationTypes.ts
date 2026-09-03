@@ -7,6 +7,8 @@ export const NOTIFICATION_TYPES = [
   { key: "due_soon", label: "Deadline do 7 dní", desc: "Denní upozornění na blížící se termín tvých projektů a subúkolů.", adminOnly: false, defaults: { inApp: true, email: false } },
   { key: "overdue", label: "Po termínu", desc: "Denní upozornění na tvé projekty a subúkoly po termínu.", adminOnly: false, defaults: { inApp: true, email: true } },
   { key: "finish_suggest", label: "Vše hotovo — nabídka Finished", desc: "Všechny subúkoly projektu, který vlastníš, jsou hotové.", adminOnly: false, defaults: { inApp: true, email: false } },
+  { key: "event_assigned", label: "Přiřazen k eventu / zakázce", desc: "Někdo tě přidal jako event manažera nebo do týmu akce.", adminOnly: false, defaults: { inApp: true, email: true } },
+  { key: "event_soon", label: "Event / zakázka do 7 dní", desc: "Denní připomínka blížících se akcí, kde jsi manažer nebo v týmu.", adminOnly: false, defaults: { inApp: true, email: false } },
   { key: "deadline_changed", label: "Člen změnil termín", desc: "Člen týmu změnil deadline nebo začátek projektu / subúkolu.", adminOnly: true, defaults: { inApp: true, email: true } },
   { key: "new_user", label: "Nový uživatel čeká na práva", desc: "Někdo se poprvé přihlásil a čeká na přidělení role.", adminOnly: true, defaults: { inApp: true, email: true } },
   { key: "invite_accepted", label: "Pozvánka přijata", desc: "Pozvaný uživatel se přihlásil a získal přidělenou roli.", adminOnly: true, defaults: { inApp: true, email: false } },

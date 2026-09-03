@@ -105,6 +105,13 @@
   --ch-web-bg: #CFFAFE;        --ch-web-text: #0E7490;
   --ch-other-bg: #EDE9FE;      --ch-other-text: #6D28D9;
 
+  /* Eventy a zakázky */
+  --ev-event-bg: #FFEDD5;      --ev-event-text: #C2410C;
+  --ev-job-bg: #E0E7FF;        --ev-job-text: #4338CA;
+  --ev-ready-bg: #DCFCE7;      --ev-ready-text: #15803D;
+  --ev-attending-bg: #FEF3C7;  --ev-attending-text: #B45309;
+  --ev-service-bg: #CFFAFE;    --ev-service-text: #0E7490;
+
   /* Deadline flagy */
   --dl-overdue: #DC2626;
   --dl-soon: #EA580C;
@@ -180,6 +187,13 @@
   --ch-web-bg: rgba(6,182,212,0.18);         --ch-web-text: #67e8f9;
   --ch-other-bg: rgba(139,92,246,0.18);      --ch-other-text: #c4b5fd;
 
+  /* Eventy a zakázky */
+  --ev-event-bg: rgba(249,115,22,0.18);     --ev-event-text: #fdba74;
+  --ev-job-bg: rgba(99,102,241,0.20);       --ev-job-text: #a5b4fc;
+  --ev-ready-bg: rgba(34,197,94,0.20);      --ev-ready-text: #86efac;
+  --ev-attending-bg: rgba(245,158,11,0.18); --ev-attending-text: #fcd34d;
+  --ev-service-bg: rgba(6,182,212,0.18);    --ev-service-text: #67e8f9;
+
   --dl-overdue: #f85149;
   --dl-soon: #fb923c;
   --dl-ok: #8b949e;
@@ -250,6 +264,11 @@
   --color-ch-newsletter-bg: var(--ch-newsletter-bg); --color-ch-newsletter-text: var(--ch-newsletter-text);
   --color-ch-web-bg: var(--ch-web-bg); --color-ch-web-text: var(--ch-web-text);
   --color-ch-other-bg: var(--ch-other-bg); --color-ch-other-text: var(--ch-other-text);
+  --color-ev-event-bg: var(--ev-event-bg); --color-ev-event-text: var(--ev-event-text);
+  --color-ev-job-bg: var(--ev-job-bg); --color-ev-job-text: var(--ev-job-text);
+  --color-ev-ready-bg: var(--ev-ready-bg); --color-ev-ready-text: var(--ev-ready-text);
+  --color-ev-attending-bg: var(--ev-attending-bg); --color-ev-attending-text: var(--ev-attending-text);
+  --color-ev-service-bg: var(--ev-service-bg); --color-ev-service-text: var(--ev-service-text);
   --color-pr-top-bg: var(--pr-top-bg); --color-pr-top-text: var(--pr-top-text);
   --color-pr-middle-bg: var(--pr-middle-bg); --color-pr-middle-text: var(--pr-middle-text);
   --color-pr-low-bg: var(--pr-low-bg); --color-pr-low-text: var(--pr-low-text);

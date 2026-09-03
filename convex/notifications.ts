@@ -182,5 +182,25 @@ export const dailyDeadlineCheck = internalMutation({
         });
       }
     }
+
+    // Eventy a zakázky — jen připomínka dopředu, „po termínu“ u akce nedává
+    // smysl (akce prostě proběhla).
+    const events = (await ctx.db.query("events").collect()).filter(
+      (e) => !e.archivedAt && e.status !== "done" && e.status !== "cancelled" && e.dateFrom
+    );
+    for (const e of events) {
+      if (e.dateFrom! < today || e.dateFrom! > in7) continue;
+      const recipients = [...new Set([...(e.managerId ? [e.managerId] : []), ...e.teamIds])];
+      for (const uid of recipients) {
+        await notify(ctx, {
+          userId: uid,
+          type: "event_soon",
+          title: `${e.kind === "event" ? "Event" : "Zakázka"} se blíží: ${e.name}`,
+          body: `${e.dateFrom}${e.location ? ` · ${e.location}` : ""}`,
+          link: `${e.kind === "event" ? "/eventy" : "/zakazky"}/${e._id}`,
+          dedupKey: `event_soon:${e._id}:${uid}:${e.dateFrom}`,
+        });
+      }
+    }
   },
 });

@@ -61,6 +61,47 @@ export const ownerValidator = v.object({
   agenda: v.optional(v.string()), // rozdělení agendy mezi více vlastníků
 });
 
+// ---- Eventy a zakázky -------------------------------------------------------
+
+/** Jediný rozdíl mezi sekcí „Eventy“ a „Zakázky“ — sdílí tabulku i kód. */
+export const eventKindValidator = v.union(v.literal("event"), v.literal("job"));
+
+/** Vlastní sada stavů (zadání Moniky), NEsdílí se se `statusValidator` projektů. */
+export const eventStatusValidator = v.union(
+  v.literal("not_started"),
+  v.literal("in_progress"),
+  v.literal("ready_to_go"), // 100 % nachystáno, můžeme vyrazit
+  v.literal("done"),
+  v.literal("cancelled")
+);
+
+/** Účastníme se (máme stánek) × dodáváme službu (natáčíme pro klienta). */
+export const eventRoleValidator = v.union(v.literal("attending"), v.literal("service"));
+
+/** Položka vychystávacího seznamu — stejný tvar pro materiál, vybavení i check list. */
+export const packItemValidator = v.object({
+  id: v.string(),
+  name: v.string(),
+  qty: v.optional(v.string()), // volný text: „2 ks“, „3 m“
+  note: v.optional(v.string()),
+  done: v.boolean(), // nachystáno
+});
+
+export const costItemValidator = v.object({
+  id: v.string(),
+  label: v.string(),
+  amount: v.number(), // Kč
+});
+
+export const contactValidator = v.object({
+  id: v.string(),
+  name: v.string(),
+  role: v.optional(v.string()), // funkce / vztah („pořadatel“, „klient“)
+  email: v.optional(v.string()),
+  phone: v.optional(v.string()),
+  note: v.optional(v.string()),
+});
+
 // ---- schéma ----------------------------------------------------------------
 
 export default defineSchema({
@@ -155,6 +196,54 @@ export default defineSchema({
   })
     .index("by_date", ["date"])
     .index("by_project", ["projectId"]),
+
+  // Eventy (veletrhy, konference) a zakázky (klientské dodávky). Jedna tabulka,
+  // dvě sekce v UI rozlišené polem `kind`. Na rozdíl od projektů jsou eventy
+  // ploché — vidí je každý přihlášený, edituje kdokoli kromě role `viewer`.
+  events: defineTable({
+    kind: eventKindValidator,
+    name: v.string(),
+    status: eventStatusValidator,
+    eventRole: v.optional(eventRoleValidator), // účastníme se × dodáváme službu
+    dateFrom: v.optional(v.string()), // YYYY-MM-DD; bez data = „bez termínu“
+    dateTo: v.optional(v.string()), // YYYY-MM-DD, vícedenní akce
+    location: v.optional(v.string()),
+    managerId: v.optional(v.id("users")), // event manažer = odpovědná osoba
+    teamIds: v.array(v.id("users")), // kdo jede / pracuje na zakázce
+    contacts: v.array(contactValidator), // kontaktní osoby na akci / u klienta
+    boothPrice: v.optional(v.number()), // cena stánku v Kč
+    costs: v.array(costItemValidator), // ostatní náklady, ručně
+    revenue: v.optional(v.number()), // fakturovaná částka (hlavně u zakázek)
+    materials: v.array(packItemValidator), // potřebné materiály
+    equipment: v.array(packItemValidator), // technika i vybavení mimo drony
+    checklist: v.array(packItemValidator), // vychystávací check list
+    todos: v.array(todoValidator),
+    description: v.optional(v.string()),
+    notes: v.optional(v.string()),
+    links: v.array(linkValidator), // Drive složky, web akce
+    archivedAt: v.optional(v.number()),
+    createdBy: v.id("users"),
+    updatedAt: v.number(),
+  })
+    .index("by_kind", ["kind"])
+    .index("by_date", ["dateFrom"])
+    .searchIndex("search_name", { searchField: "name", filterFields: ["kind", "status"] }),
+
+  // Přílohy eventů (smlouvy, objednávky, fotky) v Convex file storage.
+  // Samostatná tabulka, ne pole na `events`: soubory přibývají asynchronně a
+  // souběžně, takže read-modify-write celého pole by tiše přepisoval cizí
+  // uploady. Navíc se tak dá blob spolehlivě smazat i z úložiště.
+  eventFiles: defineTable({
+    eventId: v.id("events"),
+    storageId: v.id("_storage"),
+    name: v.string(), // původní název souboru
+    mimeType: v.string(), // z `_storage` metadat, ne z klienta
+    size: v.number(), // bytes, z `_storage` metadat
+    uploadedBy: v.id("users"),
+    createdAt: v.number(),
+  })
+    .index("by_event", ["eventId", "createdAt"])
+    .index("by_storage", ["storageId"]), // úklid osiřelých blobů v maintenance.ts
 
   // Historie změn (audit log) — projekt i subúkol.
   activity: defineTable({

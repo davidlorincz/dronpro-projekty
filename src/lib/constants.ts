@@ -136,6 +136,68 @@ export const CONTENT_STATUS_CLASS: Record<ContentStatus, string> = {
   cancelled: "bg-st-cancelled-bg text-st-cancelled-text line-through",
 };
 
+// ---- Eventy a zakázky -------------------------------------------------------
+
+export const EVENT_KINDS = ["event", "job"] as const;
+export type EventKind = (typeof EVENT_KINDS)[number];
+/** Popisky se v UI ohýbají podle sekce — jedna komponenta obsluhuje obojí. */
+export const EVENT_KIND_LABEL: Record<EventKind, string> = { event: "Event", job: "Zakázka" };
+export const EVENT_KIND_PLURAL: Record<EventKind, string> = { event: "Eventy", job: "Zakázky" };
+export const EVENT_KIND_NEW: Record<EventKind, string> = { event: "Nový event", job: "Nová zakázka" };
+export const EVENT_KIND_PATH: Record<EventKind, string> = { event: "/eventy", job: "/zakazky" };
+export const EVENT_KIND_CLASS: Record<EventKind, string> = {
+  event: "bg-ev-event-bg text-ev-event-text",
+  job: "bg-ev-job-bg text-ev-job-text",
+};
+
+export const EVENT_STATUSES = ["not_started", "in_progress", "ready_to_go", "done", "cancelled"] as const;
+export type EventStatus = (typeof EVENT_STATUSES)[number];
+export const EVENT_STATUS_LABEL: Record<EventStatus, string> = {
+  not_started: "Nezačato",
+  in_progress: "Probíhá příprava",
+  ready_to_go: "Ready to go",
+  done: "Hotovo",
+  cancelled: "Zrušeno",
+};
+export const EVENT_STATUS_HINT: Record<EventStatus, string> = {
+  not_started: "Akce je v kalendáři, ale zatím se na ní nedělá.",
+  in_progress: "Chystáme — vychystávka a úkoly běží.",
+  ready_to_go: "Vše nachystáno, můžeme vyrazit.",
+  done: "Akce proběhla a je uzavřená.",
+  cancelled: "Akce se nekoná.",
+};
+export const EVENT_STATUS_CLASS: Record<EventStatus, string> = {
+  not_started: "bg-st-not-started-bg text-st-not-started-text",
+  in_progress: "bg-st-in-progress-bg text-st-in-progress-text",
+  ready_to_go: "bg-ev-ready-bg text-ev-ready-text",
+  done: "bg-st-finished-bg text-st-finished-text",
+  cancelled: "bg-st-cancelled-bg text-st-cancelled-text line-through",
+};
+/** Barva tečky v kalendáři — hex, protože jde do inline stylu chipu. */
+export const EVENT_STATUS_HEX: Record<EventStatus, string> = {
+  not_started: "#9CA3AF",
+  in_progress: "#0E7490",
+  ready_to_go: "#047857",
+  done: "#6B7280",
+  cancelled: "#B91C1C",
+};
+
+export const EVENT_ROLES = ["attending", "service"] as const;
+export type EventRole = (typeof EVENT_ROLES)[number];
+export const EVENT_ROLE_LABEL: Record<EventRole, string> = {
+  attending: "Účastníme se",
+  service: "Dodáváme službu",
+};
+export const EVENT_ROLE_CLASS: Record<EventRole, string> = {
+  attending: "bg-ev-attending-bg text-ev-attending-text",
+  service: "bg-ev-service-bg text-ev-service-text",
+};
+
+/** Kč bez desetinných míst — ceny stánků a nákladů se v haléřích nevedou. */
+export function formatCZK(n: number): string {
+  return new Intl.NumberFormat("cs-CZ", { style: "currency", currency: "CZK", maximumFractionDigits: 0 }).format(n);
+}
+
 export type DeadlineFlag = "overdue" | "soon" | "ok" | "done" | "missing" | "longterm";
 export const DEADLINE_FLAG_CLASS: Record<DeadlineFlag, string> = {
   overdue: "text-dl-overdue font-semibold",

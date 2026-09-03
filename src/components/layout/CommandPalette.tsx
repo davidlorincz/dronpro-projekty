@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { Search, LayoutDashboard, FolderKanban, GanttChartSquare, Users, Settings, CornerDownLeft, Archive, Plus, CalendarDays } from "lucide-react";
+import { Search, LayoutDashboard, FolderKanban, GanttChartSquare, Users, Settings, CornerDownLeft, Archive, Plus, CalendarDays, PartyPopper, Briefcase, CalendarRange } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { PRIORITY_LABEL, STATUS_LABEL } from "@/lib/constants";
 import { useMe } from "./AuthGuard";
@@ -17,6 +17,9 @@ const NAV: NavItem[] = [
   { label: "Gantt", href: "/gantt", icon: GanttChartSquare },
   { label: "Content plán", href: "/content", icon: CalendarDays },
   { label: "Archiv", href: "/archiv", icon: Archive },
+  { label: "Eventy", href: "/eventy", icon: PartyPopper },
+  { label: "Zakázky", href: "/zakazky", icon: Briefcase },
+  { label: "Kalendář eventů a zakázek", href: "/kalendar", icon: CalendarRange },
   { label: "Uživatelé", href: "/uzivatele", icon: Users, adminOnly: true },
   { label: "Nastavení", href: "/nastaveni", icon: Settings, adminOnly: true },
 ];
