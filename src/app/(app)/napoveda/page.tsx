@@ -8,7 +8,7 @@ export default function HelpPage() {
           <li><b>Dashboard</b> — co hoří: po termínu, do 7 dní, blokované, bez vlastníka, bez deadlinu, moje úkoly. Vše je proklikávací.</li>
           <li><b>Portfolio</b> — tabulka všech projektů. Stav a prioritu měníš přímo v řádku. Filtry nahoře, fulltext, export CSV.</li>
           <li><b>Detail projektu</b> — subúkoly upravuješ přímo v tabulce (stav, odpovědný, priorita, začátek, deadline). Kliknutím na řádek se otevře boční panel se vším ostatním (popis, definice hotovo, TODO list s termíny, závislost, odkazy, poznámka). Řádky lze přetahovat.</li>
-          <li><b>Gantt</b> — projekt = hlavní řádek, subúkoly po rozkliknutí. Bez data → sekce „Bez termínu“ (žádná umělá data). Tažením pruhu posuneš termín, tažením za okraj změníš začátek/konec (jen člen týmu a admin).</li>
+          <li><b>Gantt</b> — ve výchozím stavu jen projekty, ať je vidět celkový přehled; subúkoly zobrazíš zaškrtnutím „zobrazit subúkoly“ nad grafem (číslo u projektu říká, kolik jich je skrytých). Bez data → sekce „Bez termínu“ (žádná umělá data). Tažením pruhu posuneš termín, tažením za okraj změníš začátek/konec (jen člen týmu a admin).</li>
           <li><b>Archiv</b> — místo mazání. Obnovit lze kdykoli; definitivní smazání jen admin.</li>
         </ul>
       </section>

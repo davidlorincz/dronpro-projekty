@@ -67,7 +67,7 @@ export function GanttView() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div><h1 className="text-2xl">Gantt</h1><p className="text-sm text-a-text-3">Projekt = hlavní řádek, subúkoly po rozbalení. Položky bez termínu jsou v samostatné sekci.</p></div>
+        <div><h1 className="text-2xl">Gantt</h1><p className="text-sm text-a-text-3">Ve výchozím stavu jen projekty; subúkoly zobrazíš zaškrtnutím nad grafem. Položky bez termínu jsou v samostatné sekci.</p></div>
         <FilterBar onClear={() => { setProjectId(undefined); setOwnerId(undefined); setPriority(undefined); }}>
           <FilterSelect value={projectId} onChange={setProjectId} allLabel="Všechny projekty" options={(projects ?? []).map((p) => ({ label: p.name, value: p._id }))} />
           <FilterSelect value={ownerId} onChange={setOwnerId} allLabel="Vlastník / odpovědný" options={users.map((u) => ({ label: u.name ?? u.email, value: u._id }))} />

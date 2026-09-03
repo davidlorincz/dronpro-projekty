@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, ChevronRight, AlertTriangle, CalendarX } from "lucide-react";
+import { AlertTriangle, CalendarX } from "lucide-react";
 import NextLink from "next/link";
 import {
   GanttProvider, GanttSidebar, GanttTimeline, GanttHeader, GanttFeatureList, GanttFeatureRow, GanttToday,
@@ -53,7 +53,9 @@ function Link({ href, className, title, children }: { href: string; className?: 
 
 export function GanttChart({ projects, linkBase = "/projekty", onMove }: { projects: GanttProject[]; linkBase?: string; onMove?: (e: GanttMoveEvent) => Promise<void> | void }) {
   const [range, setRange] = useState<Range>("monthly");
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  // Gantt se otevírá jako přehled projektů; subúkoly jsou opt-in a záměrně
+  // se nikam neukládají — každé otevření začíná čistým přehledem.
+  const [showSubtasks, setShowSubtasks] = useState(false);
   const [showUndated, setShowUndated] = useState(true);
 
   const groups = useMemo(() => projects.map((p) => {
@@ -66,9 +68,11 @@ export function GanttChart({ projects, linkBase = "/projekty", onMove }: { proje
     return { p, pf, dated: subs.filter((x) => x.f).map((x) => x.f!), undated: subs.filter((x) => !x.f).map((x) => x.s) };
   }), [projects, linkBase]);
 
-  const datedGroups = groups.filter((g) => g.pf || g.dated.length);
+  // Projekt bez vlastního pruhu pouštíme do grafu jen kvůli jeho subúkolům —
+  // se skrytými subúkoly by z něj zbyl prázdný řádek. Zůstane v „Bez termínu“.
+  const datedGroups = groups.filter((g) => g.pf || (showSubtasks && g.dated.length));
   const undatedProjects = groups.filter((g) => !g.pf).map((g) => g.p);
-  const undatedSubtasks = groups.flatMap((g) => g.undated.map((s) => ({ s, p: g.p })));
+  const undatedSubtasks = showSubtasks ? groups.flatMap((g) => g.undated.map((s) => ({ s, p: g.p }))) : [];
   const wrapRef = useRef<HTMLDivElement>(null);
   // Po vykreslení posuň timeline tak, aby byl dnešek v první třetině (2 pokusy kvůli layoutu).
   useEffect(() => {
@@ -85,8 +89,9 @@ export function GanttChart({ projects, linkBase = "/projekty", onMove }: { proje
     const t2 = setTimeout(align, 400);
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, [range, projects.length]);
-  const toggle = (id: string) => setCollapsed((c) => { const n = new Set(c); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const nothing = datedGroups.length === 0;
+  // Bez tohohle by hláška radila doplnit termíny, které ve skutečnosti existují — jen jsou schované.
+  const hiddenHaveDates = !showSubtasks && groups.some((g) => g.dated.length > 0);
 
   return (
     <div className="space-y-4">
@@ -96,9 +101,9 @@ export function GanttChart({ projects, linkBase = "/projekty", onMove }: { proje
             <button key={r} onClick={() => setRange(r)} className={cn("px-3 py-1 rounded-md cursor-pointer", range === r ? "bg-a-accent-bg text-a-accent-text font-semibold" : "text-a-text-3 hover:text-a-text")}>{l}</button>
           ))}
         </div>
-        <button onClick={() => setCollapsed(collapsed.size ? new Set() : new Set(projects.map((p) => p._id)))} className="text-xs text-a-text-3 hover:text-a-text cursor-pointer">
-          {collapsed.size ? "Rozbalit vše" : "Sbalit vše"}
-        </button>
+        <label className="inline-flex items-center gap-1.5 text-xs text-a-text-2 cursor-pointer">
+          <input type="checkbox" checked={showSubtasks} onChange={(e) => setShowSubtasks(e.target.checked)} /> zobrazit subúkoly
+        </label>
         <div className="ml-auto flex items-center gap-3 text-[11px] text-a-text-3">
           {(Object.keys(STATUS_HEX) as Status[]).map((s) => <span key={s} className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm" style={{ background: STATUS_HEX[s] }} /> {STATUS_LABEL[s]}</span>)}
           <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm overdue-hatch border border-dl-overdue" /> po termínu</span>
@@ -108,41 +113,42 @@ export function GanttChart({ projects, linkBase = "/projekty", onMove }: { proje
       </div>
 
       {nothing ? (
-        <div className="card p-8 text-center text-sm text-a-text-4">Žádná položka s termínem — doplň začátek/deadline v detailu projektu.</div>
+        <div className="card p-8 text-center text-sm text-a-text-4">
+          {hiddenHaveDates
+            ? "Žádný projekt nemá vlastní termín. Termíny mají jen subúkoly — zobraz je zaškrtnutím nad grafem."
+            : "Žádná položka s termínem — doplň začátek/deadline v detailu projektu."}
+        </div>
       ) : (
         <div ref={wrapRef} className="card overflow-hidden" style={{ height: "min(70vh, 720px)" }}>
           <GanttProvider range={range} zoom={100} className="h-full">
             <GanttSidebar className="w-[360px]">
-              {datedGroups.map(({ p, pf, dated }) => {
-                const isCollapsed = collapsed.has(p._id);
-                return (
-                  <div key={p._id}>
-                    <div className="flex items-center gap-1.5 px-2 text-xs" style={{ height: "var(--gantt-row-height)" }}>
-                      <button onClick={() => toggle(p._id)} className="p-0.5 rounded hover:bg-a-hover cursor-pointer text-a-text-3" title={isCollapsed ? "Rozbalit" : "Sbalit"} disabled={dated.length === 0}>
-                        {dated.length === 0 ? <span className="inline-block w-4" /> : isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                      </button>
-                      <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: STATUS_HEX[p.status] }} />
-                      <Link href={`${linkBase}/${p._id}`} className="flex-1 truncate font-semibold text-a-text hover:text-a-accent-text" title={p.name}>{p.name}</Link>
-                      <PriorityBadge priority={p.priority} />
-                      <span className={cn("shrink-0 tabular-nums", p.isOverdue ? "text-dl-overdue font-semibold" : "text-a-text-3")}>{p.isLongTerm ? "long-term" : p.deadline ? formatDate(p.deadline) : "—"}</span>
-                    </div>
-                    {!isCollapsed && dated.map((f) => (
-                      <div key={f.id} className="flex items-center gap-2 pl-8 pr-2 text-xs hover:bg-a-hover" style={{ height: "var(--gantt-row-height)" }}>
-                        <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: f.status.color }} />
-                        <Link href={f.href} className="flex-1 truncate text-a-text-2 hover:text-a-accent-text" title={f.name}>{f.name}</Link>
-                        <span className={cn("shrink-0 tabular-nums", f.overdue ? "text-dl-overdue font-semibold" : "text-a-text-4")}>{formatDate(dateToISO(f.endAt))}</span>
-                      </div>
-                    ))}
+              {datedGroups.map(({ p, dated }) => (
+                <div key={p._id}>
+                  <div className="flex items-center gap-1.5 px-2 text-xs" style={{ height: "var(--gantt-row-height)" }}>
+                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: STATUS_HEX[p.status] }} />
+                    <Link href={`${linkBase}/${p._id}`} className="flex-1 truncate font-semibold text-a-text hover:text-a-accent-text" title={p.name}>{p.name}</Link>
+                    {!showSubtasks && dated.length > 0 && (
+                      <span className="shrink-0 rounded bg-a-elevated px-1.5 text-[10px] tabular-nums text-a-text-3" title={`${dated.length} subúkolů s termínem — zobraz je zaškrtnutím nad grafem`}>{dated.length}</span>
+                    )}
+                    <PriorityBadge priority={p.priority} />
+                    <span className={cn("shrink-0 tabular-nums", p.isOverdue ? "text-dl-overdue font-semibold" : "text-a-text-3")}>{p.isLongTerm ? "long-term" : p.deadline ? formatDate(p.deadline) : "—"}</span>
                   </div>
-                );
-              })}
+                  {showSubtasks && dated.map((f) => (
+                    <div key={f.id} className="flex items-center gap-2 pl-8 pr-2 text-xs hover:bg-a-hover" style={{ height: "var(--gantt-row-height)" }}>
+                      <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: f.status.color }} />
+                      <Link href={f.href} className="flex-1 truncate text-a-text-2 hover:text-a-accent-text" title={f.name}>{f.name}</Link>
+                      <span className={cn("shrink-0 tabular-nums", f.overdue ? "text-dl-overdue font-semibold" : "text-a-text-4")}>{formatDate(dateToISO(f.endAt))}</span>
+                    </div>
+                  ))}
+                </div>
+              ))}
             </GanttSidebar>
             <GanttTimeline>
               <GanttHeader />
               <GanttFeatureList>
                 {datedGroups.map(({ p, pf, dated }) => {
-                  const isCollapsed = collapsed.has(p._id);
-                  const rows: Item[][] = [pf ? [pf] : [], ...(!isCollapsed ? dated.map((f) => [f]) : [])];
+                  // Musí zůstat řádek po řádku zarovnané se sidebarem výše.
+                  const rows: Item[][] = [pf ? [pf] : [], ...(showSubtasks ? dated.map((f) => [f]) : [])];
                   return (
                     <div key={p._id}>
                       {rows.map((features, i) => (
