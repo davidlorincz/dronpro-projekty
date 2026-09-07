@@ -31,16 +31,14 @@ export const DEFAULT_FROM = "DRONPRO Projekty <projekty@updates.dronpro.cz>";
 /**
  * Organizátor pozvánky musí být adresa, která poštu skutečně přijme: Gmail na
  * ni posílá odpovědi na RSVP a když se odrazí, Google událost z kalendáře zase
- * smaže. Odesíláme přitom z domény ověřené v Resendu, která schránku nemá —
- * proto se obojí drží zvlášť a rozdíl se vyznačí parametrem SENT-BY.
+ * smaže. Odesíláme přitom z domény ověřené v Resendu, která schránku nemá,
+ * takže se organizátor a odesílatel liší — a musí se lišit bez SENT-BY, viz
+ * komentář u `IcsInput.organizer`.
  */
-export function organizerFrom(): { organizer: IcsPerson; sentBy?: string } {
-  const from = parseFrom(process.env.EMAIL_FROM ?? DEFAULT_FROM);
+export function organizerFrom(): { organizer: IcsPerson } {
   const configured = process.env.CALENDAR_ORGANIZER;
-  if (!configured) return { organizer: from };
-  const organizer = parseFrom(configured);
-  // SENT-BY jen když se adresy liší, jinak je to zbytečný šum.
-  return organizer.email === from.email ? { organizer } : { organizer, sentBy: from.email };
+  if (configured) return { organizer: parseFrom(configured) };
+  return { organizer: parseFrom(process.env.EMAIL_FROM ?? DEFAULT_FROM) };
 }
 
 export type Recipient = { email: string; name?: string };

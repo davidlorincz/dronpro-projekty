@@ -67,9 +67,7 @@ async function runPlan(ctx: ActionCtx, plan: SendPlan): Promise<DeliverResult> {
   const appUrl = process.env.APP_URL ?? "http://localhost:3000";
   // Organizátor musí přijímat poštu — Gmail na jeho adresu posílá odpovědi na
   // RSVP a bounce Googlu stačí k tomu, aby událost z kalendáře zase smazal.
-  // Odesíláme z domény ověřené v Resendu, která schránku nemá, takže se adresy
-  // liší a rozdíl nese SENT-BY.
-  const { organizer, sentBy } = organizerFrom();
+  const { organizer } = organizerFrom();
   const label = EVENT_KIND_LABEL[plan.kind];
   const summary = `${label}: ${plan.name}`;
   const term = termLine(plan.dateFrom, plan.dateTo);
@@ -94,7 +92,6 @@ async function runPlan(ctx: ActionCtx, plan: SendPlan): Promise<DeliverResult> {
       description: plan.description,
       url: `${appUrl}${plan.link}`,
       organizer,
-      sentBy,
       attendees,
     });
     const contentBase64 = Buffer.from(ics, "utf8").toString("base64");
