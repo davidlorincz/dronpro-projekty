@@ -79,8 +79,14 @@ export type IcsInput = {
   location?: string;
   description?: string;
   url?: string;
-  /** Musí být adresa, ze které se e-mail odesílá — jinak Gmail RSVP nevykreslí. */
+  /**
+   * Musí to být adresa, která poštu skutečně PŘIJME — Gmail na ni posílá
+   * odpovědi na RSVP a bounce Googlu stačí k tomu, aby událost z kalendáře
+   * zase smazal. Když se liší od odesílatele, doplň `sentBy`.
+   */
   organizer: IcsPerson;
+  /** Adresa, ze které mail reálně odchází, když není totožná s organizátorem. */
+  sentBy?: string;
   attendees: IcsPerson[];
   stampMs?: number;
 };
@@ -103,8 +109,11 @@ export function buildIcs(i: IcsInput): string {
   if (i.location) lines.push(`LOCATION:${escapeText(i.location)}`);
   if (i.description) lines.push(`DESCRIPTION:${escapeText(i.description)}`);
   if (i.url) lines.push(`URL:${escapeText(i.url)}`);
+  // SENT-BY říká „tenhle odesílatel posílá jménem organizátora“ — bez něj by
+  // Gmail viděl rozpor mezi From a ORGANIZER.
+  const sentBy = i.sentBy ? `;SENT-BY=${escapeParam(`mailto:${i.sentBy}`)}` : "";
   lines.push(
-    `ORGANIZER${i.organizer.name ? `;CN=${escapeParam(i.organizer.name)}` : ""}:mailto:${i.organizer.email}`,
+    `ORGANIZER${i.organizer.name ? `;CN=${escapeParam(i.organizer.name)}` : ""}${sentBy}:mailto:${i.organizer.email}`,
   );
   for (const a of i.attendees) {
     lines.push(

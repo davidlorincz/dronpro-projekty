@@ -21,12 +21,27 @@ import {
   type UserLite,
 } from "./lib";
 import { eventKindValidator } from "./schema";
-import { buildIcs, parseFrom } from "./ics";
+import { buildIcs, parseFrom, type IcsPerson } from "./ics";
 
 /** Odstup mezi poslední úpravou a odesláním pozvánky. */
 const DEBOUNCE_MS = 3 * 60 * 1000;
 
 export const DEFAULT_FROM = "DRONPRO Projekty <projekty@updates.dronpro.cz>";
+
+/**
+ * Organizátor pozvánky musí být adresa, která poštu skutečně přijme: Gmail na
+ * ni posílá odpovědi na RSVP a když se odrazí, Google událost z kalendáře zase
+ * smaže. Odesíláme přitom z domény ověřené v Resendu, která schránku nemá —
+ * proto se obojí drží zvlášť a rozdíl se vyznačí parametrem SENT-BY.
+ */
+export function organizerFrom(): { organizer: IcsPerson; sentBy?: string } {
+  const from = parseFrom(process.env.EMAIL_FROM ?? DEFAULT_FROM);
+  const configured = process.env.CALENDAR_ORGANIZER;
+  if (!configured) return { organizer: from };
+  const organizer = parseFrom(configured);
+  // SENT-BY jen když se adresy liší, jinak je to zbytečný šum.
+  return organizer.email === from.email ? { organizer } : { organizer, sentBy: from.email };
+}
 
 export type Recipient = { email: string; name?: string };
 
@@ -348,7 +363,7 @@ export const preview = internalQuery({
       location: e.location,
       description: e.description,
       url: `${process.env.APP_URL ?? "http://localhost:3000"}${eventLink(e.kind, e._id)}`,
-      organizer: parseFrom(process.env.EMAIL_FROM ?? DEFAULT_FROM),
+      ...organizerFrom(),
       attendees,
     });
   },
