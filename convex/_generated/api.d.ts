@@ -11,6 +11,8 @@
 import type * as access from "../access.js";
 import type * as activity from "../activity.js";
 import type * as auth from "../auth.js";
+import type * as calendar from "../calendar.js";
+import type * as calendarEmail from "../calendarEmail.js";
 import type * as content from "../content.js";
 import type * as crons from "../crons.js";
 import type * as dashboard from "../dashboard.js";
@@ -21,6 +23,7 @@ import type * as events from "../events.js";
 import type * as exportData from "../exportData.js";
 import type * as gantt from "../gantt.js";
 import type * as http from "../http.js";
+import type * as ics from "../ics.js";
 import type * as invites from "../invites.js";
 import type * as lib from "../lib.js";
 import type * as maintenance from "../maintenance.js";
@@ -43,6 +46,8 @@ declare const fullApi: ApiFromModules<{
   access: typeof access;
   activity: typeof activity;
   auth: typeof auth;
+  calendar: typeof calendar;
+  calendarEmail: typeof calendarEmail;
   content: typeof content;
   crons: typeof crons;
   dashboard: typeof dashboard;
@@ -53,6 +58,7 @@ declare const fullApi: ApiFromModules<{
   exportData: typeof exportData;
   gantt: typeof gantt;
   http: typeof http;
+  ics: typeof ics;
   invites: typeof invites;
   lib: typeof lib;
   maintenance: typeof maintenance;

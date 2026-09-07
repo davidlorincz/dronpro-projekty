@@ -7,7 +7,7 @@ import { useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { Archive, ArchiveRestore, ArrowLeft, CalendarDays, Check, MapPin, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Archive, ArchiveRestore, ArrowLeft, CalendarCheck, CalendarDays, Check, MapPin, Pencil, Plus, Send, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { LinksEditor } from "@/components/shared/LinksEditor";
@@ -65,10 +65,13 @@ export function EventDetail({ id, kind }: { id: Id<"events">; kind: EventKind })
   const archive = useMutation(api.events.archive);
   const restore = useMutation(api.events.restore);
   const hardDelete = useMutation(api.events.hardDelete);
+  const sendCalendar = useMutation(api.calendar.sendNow);
+  const enableCalendar = useMutation(api.calendar.setSync);
   const router = useRouter();
 
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmCalendar, setConfirmCalendar] = useState(false);
 
   if (e === undefined) return <div className="text-sm text-a-text-3">Načítám…</div>;
   if (e === null) return <div className="text-sm text-a-text-3">Akce nenalezena.</div>;
@@ -80,6 +83,12 @@ export function EventDetail({ id, kind }: { id: Id<"events">; kind: EventKind })
   const patch = async (p: Parameters<typeof update>[0]["patch"]) => {
     try { await update({ id: e._id, patch: p }); } catch (err) { errorToast(err); }
   };
+
+  // Akce založené před nasazením kalendáře mají `calendarSync: undefined` = vypnuto.
+  const calOn = e.calendarSync === true;
+  const calPending = !!e.calendarJobId;
+  const calRecipients = (e.manager ? 1 : 0) + e.team.length +
+    (e.calendarIncludeContacts !== false ? e.contacts.filter((c) => c.email?.trim()).length : 0);
 
   return (
     <div className="space-y-4">
@@ -158,19 +167,57 @@ export function EventDetail({ id, kind }: { id: Id<"events">; kind: EventKind })
               <span className="tabular-nums">{e.packDone}/{e.packTotal} · {e.packProgress}%</span>
             </div>
           )}
-          {canEdit && !e.archivedAt && (
-            <Button
-              size="sm" variant="ghost" className="ml-auto"
-              onClick={async () => { try { await archive({ id: e._id }); toast("Archivováno", "success"); } catch (err) { errorToast(err); } }}
-            >
-              <Archive className="h-3.5 w-3.5 mr-1" /> Archivovat
-            </Button>
+          {(calOn || calPending) && (
+            <div>
+              <L>Kalendář</L>
+              <span className="text-a-text-2">
+                {calPending
+                  ? "Pozvánka se chystá k odeslání"
+                  : e.calendarSentAt
+                    ? `${e.calendarLastMethod === "CANCEL" ? "Odvoláno" : "Odesláno"} ${formatDateTime(e.calendarSentAt)} · ${e.calendarSentTo?.length ?? 0} příjemců`
+                    : e.dateFrom ? "Zapnuto, zatím neodesláno" : "Čeká na termín"}
+              </span>
+              {e.calendarLastError && (
+                <span className="text-st-blocked-text" title={e.calendarLastError}> · chyba doručení</span>
+              )}
+            </div>
           )}
-          {isAdmin && e.archivedAt && (
-            <Button size="sm" variant="ghost" className="ml-auto text-st-blocked-text" onClick={() => setConfirmDelete(true)}>
-              <Trash2 className="h-3.5 w-3.5 mr-1" /> Smazat natrvalo
-            </Button>
-          )}
+
+          {/* Jeden kontejner s `ml-auto` — jinak by se druhé tlačítko s `ml-auto`
+              odlepilo od prvního a rozbilo zarovnání řádku. */}
+          <div className="ml-auto flex items-center gap-2">
+            {editable && !calOn && (
+              <Button
+                size="sm" variant="ghost"
+                onClick={async () => {
+                  try {
+                    await enableCalendar({ eventId: e._id, enabled: true });
+                    toast("Posílání do kalendáře zapnuto", "success");
+                  } catch (err) { errorToast(err); }
+                }}
+              >
+                <CalendarCheck className="h-3.5 w-3.5 mr-1" /> Posílat do kalendáře
+              </Button>
+            )}
+            {editable && calOn && e.dateFrom && (
+              <Button size="sm" variant="ghost" onClick={() => setConfirmCalendar(true)}>
+                <Send className="h-3.5 w-3.5 mr-1" /> Poslat znovu
+              </Button>
+            )}
+            {canEdit && !e.archivedAt && (
+              <Button
+                size="sm" variant="ghost"
+                onClick={async () => { try { await archive({ id: e._id }); toast("Archivováno", "success"); } catch (err) { errorToast(err); } }}
+              >
+                <Archive className="h-3.5 w-3.5 mr-1" /> Archivovat
+              </Button>
+            )}
+            {isAdmin && e.archivedAt && (
+              <Button size="sm" variant="ghost" className="text-st-blocked-text" onClick={() => setConfirmDelete(true)}>
+                <Trash2 className="h-3.5 w-3.5 mr-1" /> Smazat natrvalo
+              </Button>
+            )}
+          </div>
         </div>
 
         {e.description && <p className="text-sm text-a-text-2 whitespace-pre-wrap">{e.description}</p>}
@@ -254,6 +301,7 @@ export function EventDetail({ id, kind }: { id: Id<"events">; kind: EventKind })
             _id: e._id, name: e.name, status: e.status, eventRole: e.eventRole,
             dateFrom: e.dateFrom, dateTo: e.dateTo, location: e.location,
             managerId: e.managerId, teamIds: e.teamIds, description: e.description,
+            calendarSync: e.calendarSync, calendarIncludeContacts: e.calendarIncludeContacts,
           }}
         />
       )}
@@ -268,6 +316,21 @@ export function EventDetail({ id, kind }: { id: Id<"events">; kind: EventKind })
             await hardDelete({ id: e._id });
             toast("Smazáno", "success");
             router.push(EVENT_KIND_PATH[kind]);
+          } catch (err) { errorToast(err); }
+        }}
+      />
+
+      <ConfirmDialog
+        open={confirmCalendar}
+        title="Poslat pozvánku znovu?"
+        description={`Pozvánka na „${e.name}“ se rozešle znovu ${calRecipients} příjemcům (manažer, tým${e.calendarIncludeContacts !== false ? " i kontakty s e-mailem" : ""}). V kalendáři se přepíše původní událost, nová nevznikne. Odpovědi Přijmout/Odmítnout se v aplikaci nesbírají.`}
+        confirmLabel="Poslat"
+        destructive={false}
+        onClose={() => setConfirmCalendar(false)}
+        onConfirm={async () => {
+          try {
+            await sendCalendar({ eventId: e._id });
+            toast("Pozvánka se odesílá", "success");
           } catch (err) { errorToast(err); }
         }}
       />

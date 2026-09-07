@@ -19,9 +19,24 @@ import {
   todoValidator,
 } from "./schema";
 import { notify } from "./notifications";
-import { daysBetween, loadUserMap, todayISO, type UserLite } from "./lib";
+import {
+  EVENT_KIND_LABEL,
+  daysBetween,
+  eventLink,
+  loadUserMap,
+  todayISO,
+  type UserLite,
+} from "./lib";
 import { deleteEventFiles } from "./eventFiles";
+import {
+  CALENDAR_FIELDS,
+  buildCancelPlan,
+  cancelCalendarNow,
+  scheduleCalendarSync,
+} from "./calendar";
+import { internal } from "./_generated/api";
 
+// prettier-ignore
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const nullable = <T extends import("convex/values").Validator<any, "required", any>>(x: T) =>
   v.optional(v.union(x, v.null()));
@@ -45,9 +60,10 @@ export type EventEnriched = Doc<"events"> & {
 export function enrichEvent(
   e: Doc<"events">,
   userMap: Map<Id<"users">, UserLite>,
-  today: string
+  today: string,
 ): EventEnriched {
-  const totalCost = (e.boothPrice ?? 0) + e.costs.reduce((s, c) => s + c.amount, 0);
+  const totalCost =
+    (e.boothPrice ?? 0) + e.costs.reduce((s, c) => s + c.amount, 0);
   const pack = [...e.materials, ...e.equipment, ...e.checklist];
   const packDone = pack.filter((i) => i.done).length;
   return {
@@ -56,7 +72,8 @@ export function enrichEvent(
     team: e.teamIds.map((id) => userMap.get(id)).filter(Boolean) as UserLite[],
     totalCost,
     profit: e.revenue === undefined ? undefined : e.revenue - totalCost,
-    packProgress: pack.length === 0 ? null : Math.round((packDone / pack.length) * 100),
+    packProgress:
+      pack.length === 0 ? null : Math.round((packDone / pack.length) * 100),
     packDone,
     packTotal: pack.length,
     todosDone: e.todos.filter((t) => t.done).length,
@@ -79,7 +96,9 @@ function isUpcoming(e: Doc<"events">, today: string) {
 export const list = query({
   args: {
     kind: eventKindValidator,
-    scope: v.optional(v.union(v.literal("active"), v.literal("archived"), v.literal("all"))),
+    scope: v.optional(
+      v.union(v.literal("active"), v.literal("archived"), v.literal("all")),
+    ),
     search: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
@@ -91,7 +110,9 @@ export const list = query({
     const all = q
       ? await ctx.db
           .query("events")
-          .withSearchIndex("search_name", (s) => s.search("name", q).eq("kind", args.kind))
+          .withSearchIndex("search_name", (s) =>
+            s.search("name", q).eq("kind", args.kind),
+          )
           .take(100)
       : await ctx.db
           .query("events")
@@ -145,7 +166,9 @@ export const calendar = query({
     const all = await ctx.db.query("events").collect();
     return all
       .filter((e) => !e.archivedAt && e.dateFrom)
-      .filter((e) => e.dateFrom! <= args.to && (e.dateTo ?? e.dateFrom!) >= args.from)
+      .filter(
+        (e) => e.dateFrom! <= args.to && (e.dateTo ?? e.dateFrom!) >= args.from,
+      )
       .sort((a, b) => a.dateFrom!.localeCompare(b.dateFrom!))
       .map((e) => enrichEvent(e, userMap, today));
   },
@@ -174,26 +197,33 @@ const eventFields = {
   description: v.optional(v.string()),
   notes: v.optional(v.string()),
   links: v.optional(v.array(linkValidator)),
+  /** Přepínače kalendáře — ostatní `calendar*` pole píše jen convex/calendar.ts. */
+  calendarSync: v.optional(v.boolean()),
+  calendarIncludeContacts: v.optional(v.boolean()),
 };
 
-function validate(a: { name?: string; dateFrom?: string | null; dateTo?: string | null }) {
-  if (a.name !== undefined && !a.name.trim()) throw new ConvexError("Název je povinný.");
+function validate(a: {
+  name?: string;
+  dateFrom?: string | null;
+  dateTo?: string | null;
+}) {
+  if (a.name !== undefined && !a.name.trim())
+    throw new ConvexError("Název je povinný.");
   if (a.dateTo && a.dateFrom && a.dateTo < a.dateFrom)
     throw new ConvexError("Konec akce nemůže být dřív než začátek.");
-  if (a.dateTo && !a.dateFrom) throw new ConvexError("Vyplň nejdřív datum začátku akce.");
-}
-
-const KIND_LABEL = { event: "Event", job: "Zakázka" } as const;
-
-/** Odkaz do appky — každá sekce má vlastní routu. */
-function eventLink(kind: Doc<"events">["kind"], id: Id<"events">) {
-  return `${kind === "event" ? "/eventy" : "/zakazky"}/${id}`;
+  if (a.dateTo && !a.dateFrom)
+    throw new ConvexError("Vyplň nejdřív datum začátku akce.");
 }
 
 /** Notifikace nově přiřazeným lidem (manažer + tým), sebe sama přeskakujeme. */
 async function notifyAssigned(
   ctx: MutationCtx,
-  opts: { event: Doc<"events">; userIds: Id<"users">[]; meId: Id<"users">; isNew: boolean }
+  opts: {
+    event: Doc<"events">;
+    userIds: Id<"users">[];
+    meId: Id<"users">;
+    isNew: boolean;
+  },
 ) {
   const { event, meId, isNew } = opts;
   for (const uid of [...new Set(opts.userIds)]) {
@@ -201,7 +231,7 @@ async function notifyAssigned(
     await notify(ctx, {
       userId: uid,
       type: "event_assigned",
-      title: `${isNew ? "Nový" : "Přiřazen"} ${KIND_LABEL[event.kind].toLowerCase()}: ${event.name}`,
+      title: `${isNew ? "Nový" : "Přiřazen"} ${EVENT_KIND_LABEL[event.kind].toLowerCase()}: ${event.name}`,
       body: event.dateFrom ? `Termín ${event.dateFrom}` : undefined,
       link: eventLink(event.kind, event._id),
     });
@@ -234,16 +264,25 @@ export const create = mutation({
       description: args.description,
       notes: args.notes,
       links: args.links ?? [],
+      // Automatika je u nových akcí zapnutá. Akce založené před nasazením mají
+      // `undefined` a zůstávají potichu, dokud si posílání někdo nezapne ručně —
+      // jinak by první úprava staré zakázky vystřelila pozvánky celému týmu.
+      calendarSync: args.calendarSync ?? true,
+      calendarIncludeContacts: args.calendarIncludeContacts ?? true,
       createdBy: me._id,
       updatedAt: Date.now(),
     });
     const created = (await ctx.db.get(id))!;
     await notifyAssigned(ctx, {
       event: created,
-      userIds: [...(args.managerId ? [args.managerId] : []), ...(args.teamIds ?? [])],
+      userIds: [
+        ...(args.managerId ? [args.managerId] : []),
+        ...(args.teamIds ?? []),
+      ],
       meId: me._id,
       isNew: true,
     });
+    await scheduleCalendarSync(ctx, id);
     return id;
   },
 });
@@ -281,7 +320,8 @@ export const update = mutation({
     // Convex zahazuje `undefined` v argumentech, takže „vymazat pole“ posílá
     // klient jako `null` — tady se to překlápí zpátky.
     const patch: Record<string, unknown> = {};
-    for (const [k, val] of Object.entries(args.patch)) patch[k] = val === null ? undefined : val;
+    for (const [k, val] of Object.entries(args.patch))
+      patch[k] = val === null ? undefined : val;
     if (typeof patch.name === "string") patch.name = patch.name.trim();
     validate({
       name: patch.name as string | undefined,
@@ -289,16 +329,33 @@ export const update = mutation({
       dateTo: (patch.dateTo ?? before.dateTo) as string | undefined,
     });
     // Konec bez začátku nedává smysl — když se maže začátek, spadne i konec.
-    if ("dateFrom" in patch && patch.dateFrom === undefined) patch.dateTo = undefined;
+    if ("dateFrom" in patch && patch.dateFrom === undefined)
+      patch.dateTo = undefined;
 
     await ctx.db.patch(args.id, { ...patch, updatedAt: Date.now() });
 
     const added: Id<"users">[] = [];
     if (Array.isArray(patch.teamIds))
-      added.push(...(patch.teamIds as Id<"users">[]).filter((id) => !before.teamIds.includes(id)));
-    if (patch.managerId && patch.managerId !== before.managerId) added.push(patch.managerId as Id<"users">);
+      added.push(
+        ...(patch.teamIds as Id<"users">[]).filter(
+          (id) => !before.teamIds.includes(id),
+        ),
+      );
+    if (patch.managerId && patch.managerId !== before.managerId)
+      added.push(patch.managerId as Id<"users">);
     if (added.length)
-      await notifyAssigned(ctx, { event: before, userIds: added, meId: me._id, isNew: false });
+      await notifyAssigned(ctx, {
+        event: before,
+        userIds: added,
+        meId: me._id,
+        isNew: false,
+      });
+
+    // Zrušení akce odvolává pozvánky, a to hned — zdržovat storno nemá smysl.
+    const cancelling =
+      patch.status === "cancelled" && before.status !== "cancelled";
+    if (cancelling || CALENDAR_FIELDS.some((f) => f in patch))
+      await scheduleCalendarSync(ctx, args.id, { immediate: cancelling });
   },
 });
 
@@ -306,8 +363,16 @@ export const setStatus = mutation({
   args: { id: v.id("events"), status: eventStatusValidator },
   handler: async (ctx, args) => {
     await requireEditor(ctx);
-    if (!(await ctx.db.get(args.id))) throw new ConvexError("Akce nenalezena.");
+    const before = await ctx.db.get(args.id);
+    if (!before) throw new ConvexError("Akce nenalezena.");
     await ctx.db.patch(args.id, { status: args.status, updatedAt: Date.now() });
+    if (
+      args.status !== before.status &&
+      (args.status === "cancelled" || before.status === "cancelled")
+    )
+      await scheduleCalendarSync(ctx, args.id, {
+        immediate: args.status === "cancelled",
+      });
   },
 });
 
@@ -316,7 +381,11 @@ export const archive = mutation({
   handler: async (ctx, args) => {
     await requireEditor(ctx);
     if (!(await ctx.db.get(args.id))) throw new ConvexError("Akce nenalezena.");
-    await ctx.db.patch(args.id, { archivedAt: Date.now(), updatedAt: Date.now() });
+    await ctx.db.patch(args.id, {
+      archivedAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+    await cancelCalendarNow(ctx, args.id);
   },
 });
 
@@ -325,7 +394,11 @@ export const restore = mutation({
   handler: async (ctx, args) => {
     await requireEditor(ctx);
     if (!(await ctx.db.get(args.id))) throw new ConvexError("Akce nenalezena.");
-    await ctx.db.patch(args.id, { archivedAt: undefined, updatedAt: Date.now() });
+    await ctx.db.patch(args.id, {
+      archivedAt: undefined,
+      updatedAt: Date.now(),
+    });
+    await scheduleCalendarSync(ctx, args.id);
   },
 });
 
@@ -337,7 +410,17 @@ export const hardDelete = mutation({
     const e = await ctx.db.get(args.id);
     if (!e) throw new ConvexError("Akce nenalezena.");
     if (!e.archivedAt)
-      throw new ConvexError("Nejdřív akci archivuj, teprve potom ji lze definitivně smazat.");
+      throw new ConvexError(
+        "Nejdřív akci archivuj, teprve potom ji lze definitivně smazat.",
+      );
+    // Storno nese celý plán s sebou: naplánovaný job by po smazání záznamu
+    // neměl kde vzít příjemce. (Archivace pozvánky odvolává už dřív, tohle je
+    // pojistka pro případ, že by se archivace a smazání potkaly těsně za sebou.)
+    const plan = await buildCancelPlan(ctx, e);
+    if (plan)
+      await ctx.scheduler.runAfter(0, internal.calendarEmail.deliverPlan, {
+        plan,
+      });
     await deleteEventFiles(ctx, e._id);
     await ctx.db.delete(e._id);
   },

@@ -22,6 +22,7 @@ export default function HelpPage() {
           <li><b>Dokumenty a fotky</b> — smlouvy a objednávky přetáhni přímo do akce (max 20 MB na soubor). Fotky se při nahrání automaticky zmenší. Na velké fotogalerie použij radši odkaz na Disk — úložiště appky je omezené.</li>
           <li><b>Kalendář</b> — eventy i zakázky v jednom měsíčním přehledu kvůli kapacitám. Vícedenní akce se táhne přes celý svůj rozsah, barva rozlišuje event od zakázky a tečka ukazuje stav. Klik do dne založí novou akci k tomu datu.</li>
           <li>Kdo je <b>event manažer</b> nebo v týmu, dostane upozornění při přiřazení a připomínku 7 dní před akcí.</li>
+          <li><b>Pozvánka do kalendáře</b> — akce s vyplněným termínem rozešle manažerovi, týmu a (volitelně) kontaktům e-mail s pozvánkou. V Gmailu se ukáže s tlačítky Ano / Ne a po přijetí se akce zapíše do kalendáře. Změna termínu, místa nebo obsazení pozvánku všem automaticky přepíše, archivace nebo zrušení ji odvolá. Odesílá se s pár minut zpožděním, aby doladění akce nerozeslalo pět e-mailů za sebou. Odpovědi Přijmout / Odmítnout se v nástroji nesbírají — kdo jede, se dál drží polem Tým.</li>
         </ul>
       </section>
       <section className="card p-5 space-y-2">

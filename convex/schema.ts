@@ -10,23 +10,36 @@ export const statusValidator = v.union(
   v.literal("blocked"),
   v.literal("on_hold"),
   v.literal("finished"),
-  v.literal("cancelled")
+  v.literal("cancelled"),
 );
 
-export const priorityValidator = v.union(v.literal("top"), v.literal("middle"), v.literal("low"));
+export const priorityValidator = v.union(
+  v.literal("top"),
+  v.literal("middle"),
+  v.literal("low"),
+);
 
 export const departmentValidator = v.union(
   v.literal("Marketing"),
   v.literal("Sales"),
   v.literal("Univerzita"),
   v.literal("Showroom"),
-  v.literal("Backoffice")
+  v.literal("Backoffice"),
 );
 
-export const phaseValidator = v.union(v.literal("not_started"), v.literal("in_progress"), v.literal("done"));
+export const phaseValidator = v.union(
+  v.literal("not_started"),
+  v.literal("in_progress"),
+  v.literal("done"),
+);
 
 /** `restricted` = vidí jen projekty, kde má vazbu (owner / spolupracující / assignee subúkolu či contentu). */
-export const roleValidator = v.union(v.literal("admin"), v.literal("member"), v.literal("restricted"), v.literal("viewer"));
+export const roleValidator = v.union(
+  v.literal("admin"),
+  v.literal("member"),
+  v.literal("restricted"),
+  v.literal("viewer"),
+);
 
 export const linkValidator = v.object({ label: v.string(), url: v.string() });
 
@@ -45,7 +58,7 @@ export const channelValidator = v.union(
   v.literal("youtube"),
   v.literal("newsletter"),
   v.literal("web"),
-  v.literal("other")
+  v.literal("other"),
 );
 
 export const contentStatusValidator = v.union(
@@ -53,7 +66,7 @@ export const contentStatusValidator = v.union(
   v.literal("planned"),
   v.literal("ready"),
   v.literal("published"),
-  v.literal("cancelled")
+  v.literal("cancelled"),
 );
 
 export const ownerValidator = v.object({
@@ -72,11 +85,14 @@ export const eventStatusValidator = v.union(
   v.literal("in_progress"),
   v.literal("ready_to_go"), // 100 % nachystáno, můžeme vyrazit
   v.literal("done"),
-  v.literal("cancelled")
+  v.literal("cancelled"),
 );
 
 /** Účastníme se (máme stánek) × dodáváme službu (natáčíme pro klienta). */
-export const eventRoleValidator = v.union(v.literal("attending"), v.literal("service"));
+export const eventRoleValidator = v.union(
+  v.literal("attending"),
+  v.literal("service"),
+);
 
 /** Položka vychystávacího seznamu — stejný tvar pro materiál, vybavení i check list. */
 export const packItemValidator = v.object({
@@ -114,10 +130,19 @@ export default defineSchema({
     name: v.optional(v.string()),
     avatarUrl: v.optional(v.string()),
     role: roleValidator,
-    status: v.union(v.literal("active"), v.literal("pending"), v.literal("disabled")),
+    status: v.union(
+      v.literal("active"),
+      v.literal("pending"),
+      v.literal("disabled"),
+    ),
     department: v.optional(departmentValidator),
     // Preference notifikací per typ: { inApp, email }; chybějící klíč = default
-    notificationPrefs: v.optional(v.record(v.string(), v.object({ inApp: v.boolean(), email: v.boolean() }))),
+    notificationPrefs: v.optional(
+      v.record(
+        v.string(),
+        v.object({ inApp: v.boolean(), email: v.boolean() }),
+      ),
+    ),
     createdAt: v.number(),
     lastSeenAt: v.optional(v.number()),
   })
@@ -222,12 +247,38 @@ export default defineSchema({
     notes: v.optional(v.string()),
     links: v.array(linkValidator), // Drive složky, web akce
     archivedAt: v.optional(v.number()),
+
+    // ---- kalendářová pozvánka (.ics) ---------------------------------------
+    // Píše je výhradně convex/calendar.ts. Do patch validatoru `events.update`
+    // NEPATŘÍ — klient by jinak mohl rozbít SEQUENCE a rozsypat pozvánky.
+    /** Zapnutá automatika. `undefined` u akcí založených před nasazením = vypnuto. */
+    calendarSync: v.optional(v.boolean()),
+    calendarIncludeContacts: v.optional(v.boolean()),
+    /** Stabilní UID → další odeslání přepíše původní událost, nevznikne duplicita. */
+    calendarUid: v.optional(v.string()),
+    /** RFC 5545 SEQUENCE; bez inkrementu Gmail aktualizaci ignoruje. */
+    calendarSequence: v.optional(v.number()),
+    calendarSentAt: v.optional(v.number()),
+    /** Komu už pozvánka šla → koho obeslat stornem při odebrání z týmu. */
+    calendarSentTo: v.optional(v.array(v.string())),
+    calendarLastMethod: v.optional(
+      v.union(v.literal("REQUEST"), v.literal("CANCEL")),
+    ),
+    calendarLastError: v.optional(v.string()),
+    /** Otisk odeslaného stavu — shoda znamená „není co posílat“. */
+    calendarFingerprint: v.optional(v.string()),
+    /** Čekající debounce job, aby ho další úprava mohla zrušit. */
+    calendarJobId: v.optional(v.id("_scheduled_functions")),
+
     createdBy: v.id("users"),
     updatedAt: v.number(),
   })
     .index("by_kind", ["kind"])
     .index("by_date", ["dateFrom"])
-    .searchIndex("search_name", { searchField: "name", filterFields: ["kind", "status"] }),
+    .searchIndex("search_name", {
+      searchField: "name",
+      filterFields: ["kind", "status"],
+    }),
 
   // Přílohy eventů (smlouvy, objednávky, fotky) v Convex file storage.
   // Samostatná tabulka, ne pole na `events`: soubory přibývají asynchronně a
@@ -303,7 +354,9 @@ export default defineSchema({
     // stav doručení e-mailu — aby admin poznal, že odkaz musí poslat ručně
     sendCount: v.number(),
     lastSentAt: v.optional(v.number()),
-    lastSendStatus: v.optional(v.union(v.literal("sent"), v.literal("error"), v.literal("skipped"))),
+    lastSendStatus: v.optional(
+      v.union(v.literal("sent"), v.literal("error"), v.literal("skipped")),
+    ),
     lastSendError: v.optional(v.string()),
   })
     .index("by_token", ["token"])

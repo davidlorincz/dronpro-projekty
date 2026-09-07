@@ -4,20 +4,26 @@ import type { QueryCtx, MutationCtx } from "./_generated/server";
 
 export type Status = Doc<"projects">["status"];
 export type Priority = Doc<"projects">["priority"];
-export type DeadlineFlag = "overdue" | "soon" | "ok" | "done" | "missing" | "longterm";
+export type DeadlineFlag =
+  "overdue" | "soon" | "ok" | "done" | "missing" | "longterm";
 
 export const DAY_MS = 86_400_000;
 
 /** Náhodný token pro veřejné odkazy (sdílené portfolio, pozvánky). */
 export function randomToken(len = 32) {
-  const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  const chars =
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
   let out = "";
   const arr = new Uint8Array(len);
   crypto.getRandomValues(arr);
   for (const b of arr) out += chars[b % chars.length];
   return out;
 }
-export const PRIORITY_ORDER: Record<Priority, number> = { top: 0, middle: 1, low: 2 };
+export const PRIORITY_ORDER: Record<Priority, number> = {
+  top: 0,
+  middle: 1,
+  low: 2,
+};
 
 export function todayISO(): string {
   // Praha ≈ UTC+1/+2; pro datumové srovnání stačí lokální den serveru posunutý na Evropu.
@@ -52,7 +58,25 @@ export function deadlineFlag(opts: {
   return "ok";
 }
 
-export type UserLite = { _id: Id<"users">; name?: string; email: string; avatarUrl?: string };
+/** Posun ISO datumu o dny. Přes UTC, aby DST nikdy neposunul den. */
+export function addDays(iso: string, days: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+}
+
+export const EVENT_KIND_LABEL = { event: "Event", job: "Zakázka" } as const;
+
+/** Odkaz do appky — každá sekce eventů má vlastní routu. */
+export function eventLink(kind: Doc<"events">["kind"], id: Id<"events">) {
+  return `${kind === "event" ? "/eventy" : "/zakazky"}/${id}`;
+}
+
+export type UserLite = {
+  _id: Id<"users">;
+  name?: string;
+  email: string;
+  avatarUrl?: string;
+};
 
 export function userLite(u: Doc<"users">): UserLite {
   return { _id: u._id, name: u.name, email: u.email, avatarUrl: u.avatarUrl };
@@ -74,12 +98,14 @@ export function enrichSubtask(
   s: Doc<"subtasks">,
   userMap: Map<Id<"users">, UserLite>,
   today: string,
-  projectName?: string
+  projectName?: string,
 ): SubtaskEnriched {
   const flag = deadlineFlag({ deadline: s.deadline, status: s.status, today });
   return {
     ...s,
-    assignees: s.assigneeIds.map((id) => userMap.get(id)).filter(Boolean) as UserLite[],
+    assignees: s.assigneeIds
+      .map((id) => userMap.get(id))
+      .filter(Boolean) as UserLite[],
     deadlineFlag: flag,
     isOverdue: flag === "overdue",
     projectName,
@@ -97,7 +123,10 @@ export type ProjectStats = {
   allDone: boolean; // všechny aktivní subúkoly hotové (>0)
 };
 
-export function computeStats(subtasks: Doc<"subtasks">[], today: string): ProjectStats {
+export function computeStats(
+  subtasks: Doc<"subtasks">[],
+  today: string,
+): ProjectStats {
   const live = subtasks.filter((s) => !s.archivedAt);
   const active = live.filter((s) => s.status !== "cancelled");
   const done = active.filter((s) => s.status === "finished");
@@ -109,7 +138,10 @@ export function computeStats(subtasks: Doc<"subtasks">[], today: string): Projec
     .filter((d): d is string => !!d && d >= today)
     .sort()[0];
   return {
-    progress: active.length === 0 ? null : Math.round((done.length / active.length) * 100),
+    progress:
+      active.length === 0
+        ? null
+        : Math.round((done.length / active.length) * 100),
     totalActive: active.length,
     doneCount: done.length,
     openCount: open.length,
@@ -133,10 +165,15 @@ export function enrichProject(
   p: Doc<"projects">,
   subtasks: Doc<"subtasks">[],
   userMap: Map<Id<"users">, UserLite>,
-  today: string
+  today: string,
 ): ProjectEnriched {
   const stats = computeStats(subtasks, today);
-  const flag = deadlineFlag({ deadline: p.deadline, status: p.status, isLongTerm: p.isLongTerm, today });
+  const flag = deadlineFlag({
+    deadline: p.deadline,
+    status: p.status,
+    isLongTerm: p.isLongTerm,
+    today,
+  });
   const isOverdue = flag === "overdue";
   return {
     ...p,
@@ -146,16 +183,24 @@ export function enrichProject(
         return u ? { ...u, agenda: o.agenda } : null;
       })
       .filter(Boolean) as (UserLite & { agenda?: string })[],
-    collaboratorUsers: p.collaboratorIds.map((id) => userMap.get(id)).filter(Boolean) as UserLite[],
+    collaboratorUsers: p.collaboratorIds
+      .map((id) => userMap.get(id))
+      .filter(Boolean) as UserLite[],
     stats,
     deadlineFlag: flag,
     isOverdue,
-    hasWarning: p.status === "blocked" || isOverdue || stats.overdueCount > 0 || stats.blockedCount > 0,
+    hasWarning:
+      p.status === "blocked" ||
+      isOverdue ||
+      stats.overdueCount > 0 ||
+      stats.blockedCount > 0,
   };
 }
 
 /** Výchozí řazení: priorita TOP→Low, uvnitř nejbližší deadline (bez deadline nakonec). */
-export function sortProjects<T extends { priority: Priority; deadline?: string; name: string }>(list: T[]) {
+export function sortProjects<
+  T extends { priority: Priority; deadline?: string; name: string },
+>(list: T[]) {
   return [...list].sort((a, b) => {
     const p = PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
     if (p !== 0) return p;
@@ -166,7 +211,10 @@ export function sortProjects<T extends { priority: Priority; deadline?: string; 
   });
 }
 
-export async function loadSubtasksByProject(ctx: QueryCtx | MutationCtx, projectIds: Id<"projects">[]) {
+export async function loadSubtasksByProject(
+  ctx: QueryCtx | MutationCtx,
+  projectIds: Id<"projects">[],
+) {
   const map = new Map<Id<"projects">, Doc<"subtasks">[]>();
   await Promise.all(
     projectIds.map(async (id) => {
@@ -175,7 +223,7 @@ export async function loadSubtasksByProject(ctx: QueryCtx | MutationCtx, project
         .withIndex("by_project", (q) => q.eq("projectId", id))
         .collect();
       map.set(id, list);
-    })
+    }),
   );
   return map;
 }

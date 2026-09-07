@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { UserPicker } from "@/components/shared/UserPicker";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   EVENT_KIND_LABEL, EVENT_KIND_NEW, EVENT_KIND_PATH, EVENT_ROLES, EVENT_ROLE_LABEL,
   EVENT_STATUSES, EVENT_STATUS_LABEL,
@@ -37,6 +38,8 @@ export type EventFormValues = {
   managerId?: Id<"users">;
   teamIds: Id<"users">[];
   description?: string;
+  calendarSync?: boolean;
+  calendarIncludeContacts?: boolean;
 };
 
 /**
@@ -49,6 +52,7 @@ export function EventFormDialog({
 }: { kind: EventKind; event?: EventFormValues; presetDate?: string; onClose: () => void }) {
   const create = useMutation(api.events.create);
   const update = useMutation(api.events.update);
+  const setSync = useMutation(api.calendar.setSync);
   const users = useQuery(api.users.list) ?? [];
   const router = useRouter();
 
@@ -61,6 +65,9 @@ export function EventFormDialog({
   const [managerId, setManagerId] = useState<Id<"users"> | "">(event?.managerId ?? "");
   const [teamIds, setTeamIds] = useState<Id<"users">[]>(event?.teamIds ?? []);
   const [description, setDescription] = useState(event?.description ?? "");
+  // U akcí založených před nasazením kalendáře je `undefined` = vypnuto.
+  const [calSync, setCalSync] = useState(event ? event.calendarSync === true : true);
+  const [calContacts, setCalContacts] = useState(event ? event.calendarIncludeContacts !== false : true);
   const [saving, setSaving] = useState(false);
 
   const label = EVENT_KIND_LABEL[kind];
@@ -84,6 +91,11 @@ export function EventFormDialog({
             description: description.trim() || null,
           },
         });
+        // Kalendář má vlastní mutaci — zapnutí rozešle pozvánky, vypnutí je odvolá,
+        // což `events.update` záměrně neumí.
+        if (calSync !== (event.calendarSync === true) ||
+            calContacts !== (event.calendarIncludeContacts !== false))
+          await setSync({ eventId: event._id, enabled: calSync, includeContacts: calContacts });
         toast(`${label} uložen${kind === "job" ? "a" : ""}`, "success");
         onClose();
       } else {
@@ -95,6 +107,8 @@ export function EventFormDialog({
           location: location.trim() || undefined,
           managerId: managerId || undefined,
           description: description.trim() || undefined,
+          calendarSync: calSync,
+          calendarIncludeContacts: calContacts,
         });
         toast(`${label} založen${kind === "job" ? "a" : ""}`, "success");
         onClose();
@@ -166,6 +180,24 @@ export function EventFormDialog({
             <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3}
                       placeholder="O co jde, co je cílem…" />
           </Field>
+
+          <div className="space-y-2 rounded-xl border border-a-border p-3">
+            <Checkbox
+              checked={calSync} onCheckedChange={(v) => setCalSync(v === true)}
+              label="Posílat pozvánku do kalendáře"
+              description={dateFrom
+                ? "Manažer i tým dostanou e-mailem pozvánku. Změna termínu, místa nebo obsazení ji všem automaticky aktualizuje."
+                : "Odešle se, jakmile vyplníš termín od."}
+            />
+            <div className="pl-8">
+              <Checkbox
+                checked={calContacts} disabled={!calSync}
+                onCheckedChange={(v) => setCalContacts(v === true)}
+                label="Poslat i externím kontaktům"
+                description="Kontaktům akce, které mají vyplněný e-mail."
+              />
+            </div>
+          </div>
 
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="secondary" onClick={onClose}>Zrušit</Button>
