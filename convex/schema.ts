@@ -50,6 +50,13 @@ export const todoValidator = v.object({
   dueDate: v.optional(v.string()), // YYYY-MM-DD
 });
 
+/** Na čem visí vlákno komentářů. Eventy a zakázky sdílí `event`. */
+export const commentEntityValidator = v.union(
+  v.literal("project"),
+  v.literal("subtask"),
+  v.literal("event"),
+);
+
 export const channelValidator = v.union(
   v.literal("instagram"),
   v.literal("facebook"),
@@ -312,10 +319,26 @@ export default defineSchema({
     .index("by_project", ["projectId", "createdAt"])
     .index("by_entity", ["entityType", "entityId", "createdAt"]),
 
+  // Komentáře (chat) pod projektem, subúkolem nebo eventem/zakázkou.
+  // Tvar kopíruje `activity`: polymorfní `entityType` + `entityId` jako string.
+  comments: defineTable({
+    entityType: commentEntityValidator,
+    entityId: v.string(), // Id<"projects"> | Id<"subtasks"> | Id<"events">
+    // U projektu i subúkolu vždy vyplněné — `projects.get` díky tomu spočítá
+    // komentáře všech subúkolů jedním dotazem. Eventy projekt nemají.
+    projectId: v.optional(v.id("projects")),
+    authorId: v.id("users"),
+    text: v.string(),
+    editedAt: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_entity", ["entityType", "entityId", "createdAt"])
+    .index("by_project", ["projectId", "createdAt"]),
+
   // In-app notifikace pro konkrétního uživatele.
   notifications: defineTable({
     userId: v.id("users"),
-    type: v.string(), // deadline_changed | overdue | due_soon | assigned | blocked | mention
+    type: v.string(), // klíč z convex/notificationTypes.ts
     title: v.string(),
     body: v.optional(v.string()),
     link: v.optional(v.string()),

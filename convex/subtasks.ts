@@ -7,6 +7,7 @@ import { requireProjectAccess, requireSubtaskAccess } from "./access";
 import { linkValidator, phaseValidator, priorityValidator, statusValidator, todoValidator } from "./schema";
 import { logActivity, fieldLabel } from "./activity";
 import { notify, notifyAdmins } from "./notifications";
+import { deleteCommentsFor, insertComment } from "./comments";
 import { computeStats, enrichSubtask, loadUserMap, todayISO } from "./lib";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -118,7 +119,8 @@ export const create = mutation({
   },
 });
 
-async function diffAndLog(ctx: MutationCtx, me: Doc<"users">, before: Doc<"subtasks">, patch: Record<string, unknown>) {
+/** `note` = volitelný vzkaz ke změně priority (jde do notifikace i do diskuze). */
+async function diffAndLog(ctx: MutationCtx, me: Doc<"users">, before: Doc<"subtasks">, patch: Record<string, unknown>, note?: string) {
   const project = await ctx.db.get(before.projectId);
   for (const [field, newValue] of Object.entries(patch)) {
     const oldValue = (before as Record<string, unknown>)[field];
@@ -148,7 +150,36 @@ async function diffAndLog(ctx: MutationCtx, me: Doc<"users">, before: Doc<"subta
         });
       }
     }
+    if (field === "priority" && project) {
+      const msg = note?.trim();
+      const change = `${fmt(field, oldValue)} → ${fmt(field, newValue)}`;
+      // Vzkaz se uloží i do diskuze, ať nezmizí jen v notifikaci.
+      if (msg) {
+        await insertComment(ctx, {
+          entityType: "subtask", entityId: before._id, projectId: before.projectId, authorId: me._id,
+          text: `Priorita ${change}: ${msg}`,
+        });
+      }
+      for (const uid of before.assigneeIds) {
+        if (uid === me._id) continue;
+        await notify(ctx, {
+          userId: uid, type: "priority_changed", title: `Priorita ${fmt(field, newValue)}: ${before.title}`,
+          body: `${project.name} · ${me.name ?? me.email}: ${change}${msg ? ` — „${msg}“` : ""}`,
+          link: `/projekty/${before.projectId}?subtask=${before._id}`,
+        });
+      }
+    }
     if (field === "status" && newValue === "finished" && project) {
+      // Hlášení „hotovo“ zadavateli: vlastníkům projektu + tomu, kdo úkol založil.
+      const reportTo = new Set<Id<"users">>([...project.owners.map((o) => o.userId), before.createdBy]);
+      for (const uid of reportTo) {
+        if (uid === me._id) continue;
+        await notify(ctx, {
+          userId: uid, type: "subtask_done", title: `Hotovo: ${before.title}`,
+          body: `${project.name} · dokončil(a) ${me.name ?? me.email}`,
+          link: `/projekty/${before.projectId}?subtask=${before._id}`,
+        });
+      }
       // Vše hotovo? → nabídka Finished vlastníkům (jednou na danou sadu subúkolů)
       const siblings = await ctx.db.query("subtasks").withIndex("by_project", (q) => q.eq("projectId", project._id)).collect();
       const merged = siblings.map((x) => (x._id === before._id ? { ...x, status: "finished" as const } : x));
@@ -195,6 +226,8 @@ export const update = mutation({
       links: v.optional(v.array(linkValidator)),
       todos: v.optional(v.array(todoValidator)),
     }),
+    /** Vzkaz ke změně priority — mimo `patch`, protože to není pole dokumentu. */
+    note: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const { me, subtask: before } = await requireSubtaskAccess(ctx, args.id);
@@ -213,7 +246,7 @@ export const update = mutation({
     if (patch.status && patch.status !== "blocked" && before.status === "blocked" && !("blockedReason" in patch)) {
       patch.blockedReason = undefined;
     }
-    await diffAndLog(ctx, me, before, patch);
+    await diffAndLog(ctx, me, before, patch, args.note);
     await ctx.db.patch(args.id, { ...patch, updatedAt: Date.now() });
     await ctx.db.patch(before.projectId, { updatedAt: Date.now() });
   },
@@ -271,6 +304,7 @@ export const hardDelete = mutation({
     // odpojit závislosti
     const dependents = await ctx.db.query("subtasks").withIndex("by_project", (q) => q.eq("projectId", s.projectId)).collect();
     for (const d of dependents) if (d.dependsOn === s._id) await ctx.db.patch(d._id, { dependsOn: undefined });
+    await deleteCommentsFor(ctx, "subtask", s._id);
     await ctx.db.delete(s._id);
     await logActivity(ctx, { entityType: "subtask", entityId: s._id, projectId: s.projectId, userId: me._id, action: "deleted", message: `Subúkol „${s.title}“ definitivně smazán` });
   },

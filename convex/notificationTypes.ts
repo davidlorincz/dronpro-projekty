@@ -3,6 +3,9 @@ export type NotificationPref = { inApp: boolean; email: boolean };
 
 export const NOTIFICATION_TYPES = [
   { key: "assigned", label: "Přiřazen úkol", desc: "Někdo tě přidal jako odpovědnou osobu k subúkolu.", adminOnly: false, defaults: { inApp: true, email: true } },
+  { key: "subtask_done", label: "Subúkol dokončen", desc: "Subúkol v projektu, který vlastníš (nebo úkol, který jsi zadal/a), přešel do stavu Finished.", adminOnly: false, defaults: { inApp: true, email: true } },
+  { key: "priority_changed", label: "Změna priority úkolu", desc: "Někdo změnil prioritu subúkolu, kde jsi odpovědná osoba — případně se vzkazem.", adminOnly: false, defaults: { inApp: true, email: false } },
+  { key: "comment", label: "Nový komentář", desc: "Někdo napsal do diskuze u projektu, subúkolu nebo akce, na které se podílíš.", adminOnly: false, defaults: { inApp: true, email: false } },
   { key: "blocked", label: "Zablokováno", desc: "Projekt nebo subúkol, kde jsi vlastník / odpovědný, přešel do stavu Blocked.", adminOnly: false, defaults: { inApp: true, email: false } },
   { key: "due_soon", label: "Deadline do 7 dní", desc: "Denní upozornění na blížící se termín tvých projektů a subúkolů.", adminOnly: false, defaults: { inApp: true, email: false } },
   { key: "overdue", label: "Po termínu", desc: "Denní upozornění na tvé projekty a subúkoly po termínu.", adminOnly: false, defaults: { inApp: true, email: true } },

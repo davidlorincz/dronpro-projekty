@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { useRouter } from "next/navigation";
 import { api } from "../../../convex/_generated/api";
-import { Bell, CheckCheck, AlertTriangle, Clock, CalendarClock, UserPlus, Settings2, Ban, CheckCircle2 } from "lucide-react";
+import { Bell, CheckCheck, AlertTriangle, Clock, CalendarClock, CalendarDays, CalendarPlus, UserPlus, UserCheck, Settings2, Ban, CheckCircle2, MessageSquare, Flag } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { timeAgo } from "@/lib/dates";
@@ -17,6 +17,12 @@ const typeIcons: Record<string, typeof Bell> = {
   new_user: UserPlus,
   blocked: Ban,
   finish_suggest: CheckCircle2,
+  subtask_done: CheckCircle2,
+  priority_changed: Flag,
+  comment: MessageSquare,
+  event_assigned: CalendarPlus,
+  event_soon: CalendarDays,
+  invite_accepted: UserCheck,
 };
 const typeColors: Record<string, string> = {
   deadline_changed: "text-blue-500",
@@ -26,6 +32,12 @@ const typeColors: Record<string, string> = {
   new_user: "text-violet-500",
   blocked: "text-red-500",
   finish_suggest: "text-emerald-500",
+  subtask_done: "text-emerald-500",
+  priority_changed: "text-orange-500",
+  comment: "text-sky-500",
+  event_assigned: "text-emerald-500",
+  event_soon: "text-amber-500",
+  invite_accepted: "text-violet-500",
 };
 
 export function NotificationPanel() {

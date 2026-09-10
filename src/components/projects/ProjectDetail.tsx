@@ -11,6 +11,7 @@ import { useMe } from "@/components/layout/AuthGuard";
 import { DeadlineText, ProgressBar, PriorityBadge, StatusBadge } from "@/components/shared/Badges";
 import { StatusSelect, PrioritySelect } from "@/components/shared/InlineSelects";
 import { UserAvatar } from "@/components/shared/UserAvatar";
+import { CommentThread } from "@/components/shared/CommentThread";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ProjectForm } from "./ProjectForm";
@@ -163,6 +164,10 @@ export function ProjectDetail({ id }: { id: Id<"projects"> }) {
 
       {/* Subúkoly */}
       <SubtaskTable project={project} editable={editable} onSelect={selectSubtask} selectedId={selectedSubtask} />
+
+      <div className="card p-4">
+        <CommentThread entityType="project" entityId={project._id} canWrite={editable} title="Diskuze k projektu" />
+      </div>
 
       {selectedSubtask && (
         <SubtaskPanel subtaskId={selectedSubtask} project={project} editable={editable} onClose={() => selectSubtask(null)} />

@@ -13,6 +13,7 @@ import type * as activity from "../activity.js";
 import type * as auth from "../auth.js";
 import type * as calendar from "../calendar.js";
 import type * as calendarEmail from "../calendarEmail.js";
+import type * as comments from "../comments.js";
 import type * as content from "../content.js";
 import type * as crons from "../crons.js";
 import type * as dashboard from "../dashboard.js";
@@ -48,6 +49,7 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   calendar: typeof calendar;
   calendarEmail: typeof calendarEmail;
+  comments: typeof comments;
   content: typeof content;
   crons: typeof crons;
   dashboard: typeof dashboard;

@@ -43,6 +43,18 @@ export function GanttView() {
    * - položka bez původního startu: tažení těla posune jen deadline; levý úchyt nastaví start explicitně
    */
   const onMove = async (e: GanttMoveEvent) => {
+    if (e.kind === "todo") {
+      // TODO nemá vlastní dokument — přepíše se `dueDate` v poli `todos` subúkolu
+      // (stejný read-modify-write jako TODO editor v SubtaskPanel).
+      const sub = full?.flatMap((p) => p.subtasks).find((s) => s._id === e.parentId);
+      const due = dateToISO(e.endAt);
+      if (!sub || sub.todos.find((t) => t.id === e.id)?.dueDate === due) return;
+      try {
+        await updateSubtask({ id: sub._id, patch: { todos: sub.todos.map((t) => (t.id === e.id ? { ...t, dueDate: due } : t)) } });
+        toast("Termín TODO upraven", "success");
+      } catch (err) { errorToast(err); }
+      return;
+    }
     const start = dateToISO(e.startAt);
     const end = dateToISO(e.endAt);
     const patch: { startDate?: string; deadline?: string } = {};
@@ -67,7 +79,7 @@ export function GanttView() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div><h1 className="text-2xl">Gantt</h1><p className="text-sm text-a-text-3">Ve výchozím stavu jen projekty; subúkoly zobrazíš zaškrtnutím nad grafem. Položky bez termínu jsou v samostatné sekci.</p></div>
+        <div><h1 className="text-2xl">Gantt</h1><p className="text-sm text-a-text-3">Ve výchozím stavu jen projekty; subúkoly a jejich TODO zobrazíš zaškrtnutím nad grafem. Položky bez termínu jsou v samostatné sekci.</p></div>
         <FilterBar onClear={() => { setProjectId(undefined); setOwnerId(undefined); setPriority(undefined); }}>
           <FilterSelect value={projectId} onChange={setProjectId} allLabel="Všechny projekty" options={(projects ?? []).map((p) => ({ label: p.name, value: p._id }))} />
           <FilterSelect value={ownerId} onChange={setOwnerId} allLabel="Vlastník / odpovědný" options={users.map((u) => ({ label: u.name ?? u.email, value: u._id }))} />

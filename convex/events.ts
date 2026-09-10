@@ -28,6 +28,7 @@ import {
   type UserLite,
 } from "./lib";
 import { deleteEventFiles } from "./eventFiles";
+import { deleteCommentsFor } from "./comments";
 import {
   CALENDAR_FIELDS,
   buildCancelPlan,
@@ -422,6 +423,7 @@ export const hardDelete = mutation({
         plan,
       });
     await deleteEventFiles(ctx, e._id);
+    await deleteCommentsFor(ctx, "event", e._id);
     await ctx.db.delete(e._id);
   },
 });

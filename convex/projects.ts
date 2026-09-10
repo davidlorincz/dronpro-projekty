@@ -92,8 +92,14 @@ export const get = query({
       .withIndex("by_project_order", (q) => q.eq("projectId", p._id))
       .collect();
     const today = todayISO();
+    // Počty komentářů u subúkolů jedním dotazem (badge v tabulce).
+    const commentCounts: Record<string, number> = {};
+    for (const c of await ctx.db.query("comments").withIndex("by_project", (q) => q.eq("projectId", p._id)).collect()) {
+      if (c.entityType === "subtask") commentCounts[c.entityId] = (commentCounts[c.entityId] ?? 0) + 1;
+    }
     return {
       ...enrichProject(p, subtasks, userMap, today),
+      commentCounts,
       subtasks: subtasks
         .filter((s) => !s.archivedAt)
         .sort((a, b) => a.order - b.order)
@@ -312,7 +318,7 @@ export const restore = mutation({
   },
 });
 
-/** Definitivní smazání — jen admin, jen archivovaný projekt. Smaže i subúkoly a historii. */
+/** Definitivní smazání — jen admin, jen archivovaný projekt. Smaže i subúkoly, historii a komentáře. */
 export const hardDelete = mutation({
   args: { id: v.id("projects") },
   handler: async (ctx, args) => {
@@ -324,6 +330,9 @@ export const hardDelete = mutation({
     for (const s of subs) await ctx.db.delete(s._id);
     const acts = await ctx.db.query("activity").withIndex("by_project", (q) => q.eq("projectId", p._id)).collect();
     for (const a of acts) await ctx.db.delete(a._id);
+    // Komentáře projektu i jeho subúkolů nesou `projectId`.
+    const comments = await ctx.db.query("comments").withIndex("by_project", (q) => q.eq("projectId", p._id)).collect();
+    for (const c of comments) await ctx.db.delete(c._id);
     await ctx.db.delete(p._id);
   },
 });

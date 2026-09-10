@@ -9,11 +9,12 @@ import { CSS } from "@dnd-kit/utilities";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import type { FunctionReturnType } from "convex/server";
-import { GripVertical, Plus, Ban, Link2, ListChecks, ChevronRight } from "lucide-react";
-import { PHASES, PHASE_LABEL, STATUSES, STATUS_LABEL, type Phase, type Status } from "@/lib/constants";
+import { GripVertical, Plus, Ban, Link2, ListChecks, ChevronRight, MessageSquare } from "lucide-react";
+import { PHASES, PHASE_LABEL, STATUSES, STATUS_LABEL, type Phase, type Priority, type Status } from "@/lib/constants";
 import { FilterBar, FilterSelect, SegmentedControl } from "@/components/admin/filters";
 import { DeadlineText, PhaseBadge } from "@/components/shared/Badges";
 import { StatusSelect, PrioritySelect, DateInput } from "@/components/shared/InlineSelects";
+import { usePriorityNote } from "./PriorityNoteDialog";
 import { UserPicker } from "@/components/shared/UserPicker";
 import { errorToast } from "@/lib/convexError";
 import { toast } from "@/lib/toast";
@@ -119,6 +120,8 @@ export function SubtaskTable({ project, editable, onSelect, selectedId }: { proj
                 {filtered.map((s) => (
                   <Row key={s._id} s={s} editable={editable} draggable={editable && !isFiltered} selected={selectedId === s._id} onSelect={() => onSelect(s._id)}
                     onPatch={(p) => patch(s._id, p)}
+                    onPriority={async (p, note) => { try { await update({ id: s._id, patch: { priority: p }, note }); } catch (err) { errorToast(err); } }}
+                    commentCount={project.commentCounts[s._id] ?? 0}
                     onStatus={async (st, reason) => { try { await setStatus({ id: s._id, status: st, blockedReason: reason }); } catch (err) { errorToast(err); } }}
                     depTitle={s.dependsOn ? project.subtasks.find((x) => x._id === s.dependsOn)?.title : undefined}
                   />
@@ -178,10 +181,12 @@ function ArchivedList({ items, editable, onSelect }: { items: Subtask[]; editabl
   );
 }
 
-function Row({ s, editable, draggable, selected, onSelect, onPatch, onStatus, depTitle }: {
+function Row({ s, editable, draggable, selected, onSelect, onPatch, onPriority, onStatus, depTitle, commentCount }: {
   s: Subtask; editable: boolean; draggable: boolean; selected: boolean; onSelect: () => void;
-  onPatch: (p: { [k: string]: unknown }) => void; onStatus: (st: Status, reason?: string) => void; depTitle?: string;
+  onPatch: (p: { [k: string]: unknown }) => void; onPriority: (p: Priority, note?: string) => Promise<void>;
+  onStatus: (st: Status, reason?: string) => void; depTitle?: string; commentCount: number;
 }) {
+  const priority = usePriorityNote(s.assigneeIds, onPriority);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: s._id, disabled: !draggable });
   const style = { transform: CSS.Transform.toString(transform), transition };
   const todosDone = s.todos.filter((t) => t.done).length;
@@ -197,6 +202,7 @@ function Row({ s, editable, draggable, selected, onSelect, onPatch, onStatus, de
           {s.status === "blocked" && s.blockedReason && <span className="inline-flex items-center gap-0.5 text-st-blocked-text"><Ban className="h-3 w-3" /> {s.blockedReason}</span>}
           {depTitle && <span className="inline-flex items-center gap-0.5" title="Závisí na"><Link2 className="h-3 w-3" /> po: {depTitle}</span>}
           {s.todos.length > 0 && <span className="inline-flex items-center gap-0.5"><ListChecks className="h-3 w-3" /> {todosDone}/{s.todos.length}</span>}
+          {commentCount > 0 && <span className="inline-flex items-center gap-0.5" title="Zprávy v diskuzi"><MessageSquare className="h-3 w-3" /> {commentCount}</span>}
         </div>
       </td>
       <td className="px-2 py-1.5" onClick={(e) => e.stopPropagation()}>
@@ -207,7 +213,7 @@ function Row({ s, editable, draggable, selected, onSelect, onPatch, onStatus, de
         ) : <PhaseBadge phase={s.phase} />}
       </td>
       <td className="px-2 py-1.5"><UserPicker compact value={s.assigneeIds} disabled={!editable} onChange={(ids) => onPatch({ assigneeIds: ids })} /></td>
-      <td className="px-2 py-1.5"><PrioritySelect value={s.priority} disabled={!editable} onChange={(p) => onPatch({ priority: p })} /></td>
+      <td className="px-2 py-1.5"><PrioritySelect value={s.priority} disabled={!editable} onChange={priority.request} />{priority.dialog}</td>
       <td className="px-2 py-1.5"><StatusSelect value={s.status} reason={s.blockedReason} disabled={!editable} onChange={onStatus} /></td>
       <td className="px-2 py-1.5">{editable ? <DateInput value={s.startDate} onChange={(v) => onPatch({ startDate: v })} /> : <span className="text-a-text-2 text-sm">{s.startDate ? new Date(s.startDate).toLocaleDateString("cs-CZ") : "—"}</span>}</td>
       <td className="px-2 py-1.5">

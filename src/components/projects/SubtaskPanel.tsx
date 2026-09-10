@@ -11,6 +11,8 @@ import { UserPicker } from "@/components/shared/UserPicker";
 import { StatusSelect } from "@/components/shared/InlineSelects";
 import { LinksEditor } from "@/components/shared/LinksEditor";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { CommentThread } from "@/components/shared/CommentThread";
+import { usePriorityNote } from "./PriorityNoteDialog";
 import { useMe } from "@/components/layout/AuthGuard";
 import { errorToast } from "@/lib/convexError";
 import { toast } from "@/lib/toast";
@@ -46,6 +48,10 @@ export function SubtaskPanel({ subtaskId, project, editable, onClose }: { subtas
   const hardDelete = useMutation(api.subtasks.hardDelete);
   const [confirm, setConfirm] = useState<"archive" | "delete" | null>(null);
   const [newTodo, setNewTodo] = useState("");
+  const s0 = project.subtasks.find((x) => x._id === subtaskId);
+  const priority = usePriorityNote(s0?.assigneeIds ?? [], async (p, note) => {
+    try { await update({ id: subtaskId, patch: { priority: p }, note }); } catch (e) { errorToast(e); }
+  });
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -82,7 +88,8 @@ export function SubtaskPanel({ subtaskId, project, editable, onClose }: { subtas
               <div className="h-[34px] flex items-center"><StatusSelect size="md" value={s.status} reason={s.blockedReason} disabled={!can} onChange={async (st, r) => { try { await setStatus({ id: s._id, status: st, blockedReason: r }); } catch (e) { errorToast(e); } }} /></div>
             </div>
             <label><L>Priorita</L>
-              <select disabled={!can} value={s.priority} className={inputCls} onChange={(e) => patch({ priority: e.target.value as Priority })}>{PRIORITIES.map((x) => <option key={x} value={x}>{PRIORITY_LABEL[x]}</option>)}</select>
+              <select disabled={!can} value={s.priority} className={inputCls} onChange={(e) => priority.request(e.target.value as Priority)}>{PRIORITIES.map((x) => <option key={x} value={x}>{PRIORITY_LABEL[x]}</option>)}</select>
+              {priority.dialog}
             </label>
             <label><L>Fáze</L>
               <select disabled={!can} value={s.phase ?? ""} className={inputCls} onChange={(e) => patch({ phase: (e.target.value || null) as Phase | null })}><option value="">—</option>{PHASES.map((x) => <option key={x} value={x}>{PHASE_LABEL[x]}</option>)}</select>
@@ -133,6 +140,7 @@ export function SubtaskPanel({ subtaskId, project, editable, onClose }: { subtas
           <div><L>Odkazy na podklady</L>{can ? <LinksEditor compact value={s.links} onChange={(l) => patch({ links: l })} /> : <ul>{s.links.map((l, i) => <li key={i}><a className="text-a-accent-text" href={l.url} target="_blank" rel="noreferrer">{l.label}</a></li>)}</ul>}</div>
           <div><L>Poznámka</L><AutoText textarea rows={2} disabled={!can} value={s.notes ?? ""} onSave={(v) => patch({ notes: str(v) })} /></div>
           <div className="text-[11px] text-a-text-4">Poslední aktualizace: {formatDateTime(s.updatedAt)}</div>
+          <CommentThread entityType="subtask" entityId={s._id} canWrite={can} className="pt-3 border-t border-a-border-subtle" />
         </div>
 
         {editable && (

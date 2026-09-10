@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { LinksEditor } from "@/components/shared/LinksEditor";
 import { UserAvatars } from "@/components/shared/UserAvatar";
+import { CommentThread } from "@/components/shared/CommentThread";
 import { useMe } from "@/components/layout/AuthGuard";
 import {
   EVENT_KIND_LABEL, EVENT_KIND_PATH, EVENT_KIND_PLURAL, EVENT_ROLE_CLASS, EVENT_ROLE_LABEL,
@@ -241,6 +242,10 @@ export function EventDetail({ id, kind }: { id: Id<"events">; kind: EventKind })
 
           <div className="card p-4">
             <EventFilesPanel eventId={e._id} editable={editable} />
+          </div>
+
+          <div className="card p-4">
+            <CommentThread entityType="event" entityId={e._id} canWrite={editable} />
           </div>
 
           <div className="card p-4 space-y-3">
