@@ -50,6 +50,15 @@ export const todoValidator = v.object({
   dueDate: v.optional(v.string()), // YYYY-MM-DD
 });
 
+/** Úkol eventu/zakázky — navíc odpovědní lidé (subúkoly je mají o úroveň výš). */
+export const eventTodoValidator = v.object({
+  id: v.string(),
+  text: v.string(),
+  done: v.boolean(),
+  dueDate: v.optional(v.string()), // YYYY-MM-DD
+  assigneeIds: v.optional(v.array(v.id("users"))),
+});
+
 /** Na čem visí vlákno komentářů. Eventy a zakázky sdílí `event`. */
 export const commentEntityValidator = v.union(
   v.literal("project"),
@@ -249,7 +258,7 @@ export default defineSchema({
     materials: v.array(packItemValidator), // potřebné materiály
     equipment: v.array(packItemValidator), // technika i vybavení mimo drony
     checklist: v.array(packItemValidator), // vychystávací check list
-    todos: v.array(todoValidator),
+    todos: v.array(eventTodoValidator),
     description: v.optional(v.string()),
     notes: v.optional(v.string()),
     links: v.array(linkValidator), // Drive složky, web akce

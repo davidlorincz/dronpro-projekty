@@ -12,12 +12,13 @@ import { Button } from "@/components/ui/button";
 import { UserPicker } from "@/components/shared/UserPicker";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  EVENT_KIND_LABEL, EVENT_KIND_NEW, EVENT_KIND_PATH, EVENT_ROLES, EVENT_ROLE_LABEL,
+  EVENT_KINDS, EVENT_KIND_LABEL, EVENT_KIND_NEW, EVENT_KIND_PATH, EVENT_KIND_PLURAL, EVENT_ROLES, EVENT_ROLE_LABEL,
   EVENT_STATUSES, EVENT_STATUS_LABEL,
   type EventKind, type EventRole, type EventStatus,
 } from "@/lib/constants";
 import { toast } from "@/lib/toast";
 import { errorToast } from "@/lib/convexError";
+import { cn } from "@/lib/utils";
 
 const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
   <label className="block">
@@ -29,6 +30,7 @@ const selectCls = "w-full rounded-xl border border-a-border bg-a-input px-3 py-2
 
 export type EventFormValues = {
   _id: Id<"events">;
+  kind: EventKind;
   name: string;
   status: string;
   eventRole?: string;
@@ -56,6 +58,8 @@ export function EventFormDialog({
   const users = useQuery(api.users.list) ?? [];
   const router = useRouter();
 
+  // Typ jde přepnout — lidi akci občas založí ve špatné sekci.
+  const [kindValue, setKindValue] = useState<EventKind>(event?.kind ?? kind);
   const [name, setName] = useState(event?.name ?? "");
   const [status, setStatus] = useState<EventStatus>((event?.status as EventStatus) ?? "not_started");
   const [eventRole, setEventRole] = useState<EventRole | "">((event?.eventRole as EventRole) ?? "");
@@ -70,7 +74,8 @@ export function EventFormDialog({
   const [calContacts, setCalContacts] = useState(event ? event.calendarIncludeContacts !== false : true);
   const [saving, setSaving] = useState(false);
 
-  const label = EVENT_KIND_LABEL[kind];
+  const label = EVENT_KIND_LABEL[kindValue];
+  const kindChanged = !!event && kindValue !== event.kind;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,6 +87,7 @@ export function EventFormDialog({
         await update({
           id: event._id,
           patch: {
+            ...(kindChanged ? { kind: kindValue } : {}),
             name: name.trim(), status, teamIds,
             eventRole: eventRole || null,
             dateFrom: dateFrom || null,
@@ -96,11 +102,16 @@ export function EventFormDialog({
         if (calSync !== (event.calendarSync === true) ||
             calContacts !== (event.calendarIncludeContacts !== false))
           await setSync({ eventId: event._id, enabled: calSync, includeContacts: calContacts });
-        toast(`${label} uložen${kind === "job" ? "a" : ""}`, "success");
         onClose();
+        if (kindChanged) {
+          toast(`Přesunuto do sekce ${EVENT_KIND_PLURAL[kindValue]}`, "success");
+          router.replace(`${EVENT_KIND_PATH[kindValue]}/${event._id}`);
+        } else {
+          toast(`${label} uložen${kindValue === "job" ? "a" : ""}`, "success");
+        }
       } else {
         const id = await create({
-          kind, name: name.trim(), status, teamIds,
+          kind: kindValue, name: name.trim(), status, teamIds,
           eventRole: eventRole || undefined,
           dateFrom: dateFrom || undefined,
           dateTo: dateTo || undefined,
@@ -110,9 +121,9 @@ export function EventFormDialog({
           calendarSync: calSync,
           calendarIncludeContacts: calContacts,
         });
-        toast(`${label} založen${kind === "job" ? "a" : ""}`, "success");
+        toast(`${label} založen${kindValue === "job" ? "a" : ""}`, "success");
         onClose();
-        router.push(`${EVENT_KIND_PATH[kind]}/${id}`);
+        router.push(`${EVENT_KIND_PATH[kindValue]}/${id}`);
       }
     } catch (err) {
       errorToast(err);
@@ -125,13 +136,36 @@ export function EventFormDialog({
     <Dialog open onOpenChange={(v) => { if (!v) onClose(); }}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{event ? `Upravit — ${event.name}` : EVENT_KIND_NEW[kind]}</DialogTitle>
+          <DialogTitle>{event ? `Upravit — ${event.name}` : EVENT_KIND_NEW[kindValue]}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={submit} className="space-y-4">
+          <div>
+            <span className="block text-xs font-semibold uppercase tracking-wider text-a-text-3 mb-1">Typ</span>
+            <div className="inline-flex rounded-xl border border-a-border bg-a-input p-0.5" role="radiogroup" aria-label="Typ">
+              {EVENT_KINDS.map((k) => (
+                <button
+                  key={k} type="button" role="radio" aria-checked={kindValue === k}
+                  onClick={() => setKindValue(k)}
+                  className={cn(
+                    "rounded-lg px-3 py-1.5 text-sm font-medium cursor-pointer",
+                    kindValue === k ? "bg-a-elevated text-a-text shadow-sm" : "text-a-text-3 hover:text-a-text",
+                  )}
+                >
+                  {EVENT_KIND_LABEL[k]}
+                </button>
+              ))}
+            </div>
+            {kindChanged && (
+              <span className="mt-1 block text-xs text-a-text-3">
+                Po uložení se přesune do sekce {EVENT_KIND_PLURAL[kindValue]}.
+              </span>
+            )}
+          </div>
+
           <Field label="Název">
             <Input value={name} onChange={(e) => setName(e.target.value)} autoFocus
-                   placeholder={kind === "event" ? "Veletrh AMPER 2026" : "Natáčení haly pro ACME"} />
+                   placeholder={kindValue === "event" ? "Veletrh AMPER 2026" : "Natáčení haly pro ACME"} />
           </Field>
 
           <div className="grid grid-cols-2 gap-3">
@@ -163,7 +197,7 @@ export function EventFormDialog({
           </Field>
 
           <div className="grid grid-cols-2 gap-3">
-            <Field label={kind === "event" ? "Event manažer" : "Odpovědná osoba"}>
+            <Field label={kindValue === "event" ? "Event manažer" : "Odpovědná osoba"}>
               <select value={managerId} onChange={(e) => setManagerId(e.target.value as Id<"users"> | "")} className={selectCls}>
                 <option value="">—</option>
                 {users.filter((u) => u.status === "active").map((u) => (

@@ -10,8 +10,12 @@ import { UserAvatar, UserAvatars } from "./UserAvatar";
 
 /** Multi-select uživatelů jako popover; zobrazuje stack avatarů. */
 export function UserPicker({
-  value, onChange, disabled, placeholder = "Přiřadit", compact = false,
-}: { value: Id<"users">[]; onChange: (ids: Id<"users">[]) => void; disabled?: boolean; placeholder?: string; compact?: boolean }) {
+  value, onChange, disabled, placeholder = "Přiřadit", compact = false, align = "left",
+}: {
+  value: Id<"users">[]; onChange: (ids: Id<"users">[]) => void; disabled?: boolean; placeholder?: string; compact?: boolean;
+  /** `right` u pickeru při pravém okraji, aby popover nepřetekl mimo obrazovku. */
+  align?: "left" | "right";
+}) {
   const users = useQuery(api.users.list) ?? [];
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -50,7 +54,7 @@ export function UserPicker({
         )}
       </button>
       {open && (
-        <div className="absolute z-50 mt-1 left-0 w-64 bg-a-surface border border-a-border rounded-xl shadow-xl p-2">
+        <div className={cn("absolute z-50 mt-1 w-64 bg-a-surface border border-a-border rounded-xl shadow-xl p-2", align === "right" ? "right-0" : "left-0")}>
           <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Hledat…"
             className="w-full mb-1 rounded-lg bg-a-input border border-a-border px-2 py-1.5 text-sm outline-none focus:border-cyan-500" />
           <ul className="max-h-56 overflow-y-auto">

@@ -45,6 +45,7 @@ export type Recipient = { email: string; name?: string };
 
 /** Pole, jejichž změna mění obsah pozvánky (viz `fingerprint`). */
 export const CALENDAR_FIELDS = [
+  "kind", // SUMMARY je „Event: …“ / „Zakázka: …“
   "name",
   "dateFrom",
   "dateTo",
@@ -90,6 +91,7 @@ export function collectRecipients(
 /** Otisk odeslaného stavu. Shoda + stejní příjemci = není co posílat. */
 export function fingerprint(e: Doc<"events">, emails: string[]): string {
   return JSON.stringify([
+    e.kind,
     e.name,
     e.dateFrom ?? null,
     e.dateTo ?? null,

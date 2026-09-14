@@ -16,7 +16,7 @@ import {
   eventStatusValidator,
   linkValidator,
   packItemValidator,
-  todoValidator,
+  eventTodoValidator,
 } from "./schema";
 import { notify } from "./notifications";
 import {
@@ -194,7 +194,7 @@ const eventFields = {
   materials: v.optional(v.array(packItemValidator)),
   equipment: v.optional(v.array(packItemValidator)),
   checklist: v.optional(v.array(packItemValidator)),
-  todos: v.optional(v.array(todoValidator)),
+  todos: v.optional(v.array(eventTodoValidator)),
   description: v.optional(v.string()),
   notes: v.optional(v.string()),
   links: v.optional(v.array(linkValidator)),
@@ -292,6 +292,8 @@ export const update = mutation({
   args: {
     id: v.id("events"),
     patch: v.object({
+      /** Přesun mezi Eventy a Zakázkami — lidi akci občas založí ve špatné sekci. */
+      kind: v.optional(eventKindValidator),
       name: v.optional(v.string()),
       status: v.optional(eventStatusValidator),
       eventRole: nullable(eventRoleValidator),
@@ -307,7 +309,7 @@ export const update = mutation({
       materials: v.optional(v.array(packItemValidator)),
       equipment: v.optional(v.array(packItemValidator)),
       checklist: v.optional(v.array(packItemValidator)),
-      todos: v.optional(v.array(todoValidator)),
+      todos: v.optional(v.array(eventTodoValidator)),
       description: nullable(v.string()),
       notes: nullable(v.string()),
       links: v.optional(v.array(linkValidator)),
@@ -334,6 +336,7 @@ export const update = mutation({
       patch.dateTo = undefined;
 
     await ctx.db.patch(args.id, { ...patch, updatedAt: Date.now() });
+    const after = (await ctx.db.get(args.id))!;
 
     const added: Id<"users">[] = [];
     if (Array.isArray(patch.teamIds))
@@ -346,11 +349,29 @@ export const update = mutation({
       added.push(patch.managerId as Id<"users">);
     if (added.length)
       await notifyAssigned(ctx, {
-        event: before,
+        event: after,
         userIds: added,
         meId: me._id,
         isNew: false,
       });
+
+    // Nově přiřazení lidé u jednotlivých úkolů.
+    if (Array.isArray(patch.todos)) {
+      const prevById = new Map(before.todos.map((t) => [t.id, t]));
+      for (const t of after.todos) {
+        const prev = prevById.get(t.id)?.assigneeIds ?? [];
+        for (const uid of t.assigneeIds ?? []) {
+          if (uid === me._id || prev.includes(uid)) continue;
+          await notify(ctx, {
+            userId: uid,
+            type: "event_assigned",
+            title: `Nový úkol: ${t.text}`,
+            body: `${EVENT_KIND_LABEL[after.kind]} ${after.name}${t.dueDate ? ` · termín ${t.dueDate}` : ""}`,
+            link: eventLink(after.kind, after._id),
+          });
+        }
+      }
+    }
 
     // Zrušení akce odvolává pozvánky, a to hned — zdržovat storno nemá smysl.
     const cancelling =

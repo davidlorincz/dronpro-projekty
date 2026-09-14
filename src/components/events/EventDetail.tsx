@@ -13,6 +13,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { LinksEditor } from "@/components/shared/LinksEditor";
 import { UserAvatars } from "@/components/shared/UserAvatar";
 import { CommentThread } from "@/components/shared/CommentThread";
+import { UserPicker } from "@/components/shared/UserPicker";
 import { useMe } from "@/components/layout/AuthGuard";
 import {
   EVENT_KIND_LABEL, EVENT_KIND_PATH, EVENT_KIND_PLURAL, EVENT_ROLE_CLASS, EVENT_ROLE_LABEL,
@@ -58,7 +59,7 @@ function AutoText({
   );
 }
 
-export function EventDetail({ id, kind }: { id: Id<"events">; kind: EventKind }) {
+export function EventDetail({ id, kind: routeKind }: { id: Id<"events">; kind: EventKind }) {
   const { canEdit, isAdmin } = useMe();
   const e = useQuery(api.events.get, { id });
   const update = useMutation(api.events.update);
@@ -74,9 +75,16 @@ export function EventDetail({ id, kind }: { id: Id<"events">; kind: EventKind })
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmCalendar, setConfirmCalendar] = useState(false);
 
+  // Typ jde přepnout — starý odkaz (/eventy/<id> u zakázky) přesměrujeme do správné sekce.
+  const actualKind = e?.kind;
+  useEffect(() => {
+    if (actualKind && actualKind !== routeKind) router.replace(`${EVENT_KIND_PATH[actualKind]}/${id}`);
+  }, [actualKind, routeKind, id, router]);
+
   if (e === undefined) return <div className="text-sm text-a-text-3">Načítám…</div>;
   if (e === null) return <div className="text-sm text-a-text-3">Akce nenalezena.</div>;
 
+  const kind = e.kind;
   const label = EVENT_KIND_LABEL[kind];
   const editable = canEdit && !e.archivedAt;
   // `null` znamená pro Convex „vymaž pole“ — prázdný string by uložil prázdno.
@@ -303,7 +311,7 @@ export function EventDetail({ id, kind }: { id: Id<"events">; kind: EventKind })
         <EventFormDialog
           kind={kind} onClose={() => setEditing(false)}
           event={{
-            _id: e._id, name: e.name, status: e.status, eventRole: e.eventRole,
+            _id: e._id, kind: e.kind, name: e.name, status: e.status, eventRole: e.eventRole,
             dateFrom: e.dateFrom, dateTo: e.dateTo, location: e.location,
             managerId: e.managerId, teamIds: e.teamIds, description: e.description,
             calendarSync: e.calendarSync, calendarIncludeContacts: e.calendarIncludeContacts,
@@ -366,7 +374,7 @@ function TodoList({
       ) : (
         <ul className="space-y-1">
           {todos.map((t) => (
-            <li key={t.id} className="flex items-center gap-2 text-sm">
+            <li key={t.id} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
               <button
                 type="button" disabled={disabled}
                 onClick={() => onChange(todos.map((x) => (x.id === t.id ? { ...x, done: !x.done } : x)))}
@@ -379,19 +387,26 @@ function TodoList({
               <input
                 disabled={disabled} value={t.text}
                 onChange={(ev) => onChange(todos.map((x) => (x.id === t.id ? { ...x, text: ev.target.value } : x)))}
-                className={cn("flex-1 bg-transparent outline-none", t.done && "line-through text-a-text-4")}
+                className={cn("min-w-32 flex-1 bg-transparent outline-none", t.done && "line-through text-a-text-4")}
               />
-              <input
-                type="date" disabled={disabled} value={t.dueDate ?? ""} title="Termín"
-                onChange={(ev) => onChange(todos.map((x) => (x.id === t.id ? { ...x, dueDate: ev.target.value || undefined } : x)))}
-                className="bg-transparent text-[11px] text-a-text-3 outline-none w-[7.5rem]"
-              />
-              {!disabled && (
-                <button type="button" onClick={() => onChange(todos.filter((x) => x.id !== t.id))}
-                        className="text-a-text-4 hover:text-st-blocked-text cursor-pointer" aria-label="Smazat úkol">
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              )}
+              {/* Ovládání držíme pohromadě — na úzké kartě se zalomí celé pod text. */}
+              <div className="ml-auto flex shrink-0 items-center gap-2">
+                <UserPicker
+                  compact align="right" disabled={disabled} placeholder="Kdo" value={t.assigneeIds ?? []}
+                  onChange={(ids) => onChange(todos.map((x) => (x.id === t.id ? { ...x, assigneeIds: ids } : x)))}
+                />
+                <input
+                  type="date" disabled={disabled} value={t.dueDate ?? ""} title="Termín"
+                  onChange={(ev) => onChange(todos.map((x) => (x.id === t.id ? { ...x, dueDate: ev.target.value || undefined } : x)))}
+                  className="bg-transparent text-[11px] text-a-text-3 outline-none w-[7.5rem]"
+                />
+                {!disabled && (
+                  <button type="button" onClick={() => onChange(todos.filter((x) => x.id !== t.id))}
+                          className="text-a-text-4 hover:text-st-blocked-text cursor-pointer" aria-label="Smazat úkol">
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
             </li>
           ))}
         </ul>
