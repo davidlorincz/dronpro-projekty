@@ -512,5 +512,15 @@ select:-webkit-autofill:focus {
   background-image: repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(220,38,38,0.35) 4px, rgba(220,38,38,0.35) 7px);
 }
 
+/* Kalendář akcí: šrafa „probíhá příprava“ (bere barvu textu, funguje v obou tématech) */
+.cal-hatch {
+  background-image: repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in srgb, currentColor 14%, transparent) 6px 9px);
+}
+.cal-weekend { background: color-mix(in srgb, var(--a-elevated) 45%, transparent); }
+@keyframes calInLeft { from { transform: translateX(-14px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes calInRight { from { transform: translateX(14px); opacity: 0; } to { transform: none; opacity: 1; } }
+.cal-in-left { animation: calInLeft .22s ease-out; }
+.cal-in-right { animation: calInRight .22s ease-out; }
+
 @keyframes slideInRight { from { transform: translateX(24px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 .animate-slide-in { animation: slideInRight .2s ease-out; }

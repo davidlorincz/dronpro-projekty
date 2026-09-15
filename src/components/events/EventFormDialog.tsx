@@ -50,8 +50,8 @@ export type EventFormValues = {
  * narostl do nepoužitelné délky.
  */
 export function EventFormDialog({
-  kind, event, presetDate, onClose,
-}: { kind: EventKind; event?: EventFormValues; presetDate?: string; onClose: () => void }) {
+  kind, event, presetDate, presetDateTo, onClose,
+}: { kind: EventKind; event?: EventFormValues; presetDate?: string; presetDateTo?: string; onClose: () => void }) {
   const create = useMutation(api.events.create);
   const update = useMutation(api.events.update);
   const setSync = useMutation(api.calendar.setSync);
@@ -64,7 +64,7 @@ export function EventFormDialog({
   const [status, setStatus] = useState<EventStatus>((event?.status as EventStatus) ?? "not_started");
   const [eventRole, setEventRole] = useState<EventRole | "">((event?.eventRole as EventRole) ?? "");
   const [dateFrom, setDateFrom] = useState(event?.dateFrom ?? presetDate ?? "");
-  const [dateTo, setDateTo] = useState(event?.dateTo ?? "");
+  const [dateTo, setDateTo] = useState(event?.dateTo ?? presetDateTo ?? "");
   const [location, setLocation] = useState(event?.location ?? "");
   const [managerId, setManagerId] = useState<Id<"users"> | "">(event?.managerId ?? "");
   const [teamIds, setTeamIds] = useState<Id<"users">[]>(event?.teamIds ?? []);

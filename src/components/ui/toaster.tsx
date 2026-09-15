@@ -9,7 +9,8 @@ export function Toaster() {
 
   useEffect(() => _addToastListener(t => {
     setToasts(p => [...p, t]);
-    setTimeout(() => setToasts(p => p.filter(x => x.id !== t.id)), 4000);
+    // S akcí („Vrátit“) necháme toast déle, ať se na tlačítko dá dojet myší.
+    setTimeout(() => setToasts(p => p.filter(x => x.id !== t.id)), t.action ? 8000 : 4000);
   }), []);
 
   if (toasts.length === 0) return null;
@@ -34,6 +35,14 @@ export function Toaster() {
               <span className="text-xs text-a-text-4 block mt-1">{t.hint}</span>
             )}
           </div>
+          {t.action && (
+            <button
+              onClick={() => { t.action!.onClick(); setToasts(p => p.filter(x => x.id !== t.id)); }}
+              className="shrink-0 rounded-lg px-2 py-0.5 text-sm font-semibold text-a-accent-text hover:bg-a-accent-bg cursor-pointer"
+            >
+              {t.action.label}
+            </button>
+          )}
           <button
             onClick={() => setToasts(p => p.filter(x => x.id !== t.id))}
             className="text-a-text-4 hover:text-a-text-2 shrink-0 cursor-pointer"
