@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { Search, LayoutDashboard, FolderKanban, GanttChartSquare, Users, Settings, CornerDownLeft, Archive, Plus, CalendarDays, PartyPopper, Briefcase, CalendarRange } from "lucide-react";
+import { Search, LayoutDashboard, FolderKanban, GanttChartSquare, Users, Settings, CornerDownLeft, Archive, Plus, CalendarDays, PartyPopper, Briefcase, CalendarRange, MessagesSquare, Hash } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { PRIORITY_LABEL, STATUS_LABEL } from "@/lib/constants";
 import { useMe } from "./AuthGuard";
@@ -17,6 +17,7 @@ const NAV: NavItem[] = [
   { label: "Gantt", href: "/gantt", icon: GanttChartSquare },
   { label: "Content plán", href: "/content", icon: CalendarDays },
   { label: "Archiv", href: "/archiv", icon: Archive },
+  { label: "Chat", href: "/chat", icon: MessagesSquare },
   { label: "Eventy", href: "/eventy", icon: PartyPopper },
   { label: "Zakázky", href: "/zakazky", icon: Briefcase },
   { label: "Kalendář eventů a zakázek", href: "/kalendar", icon: CalendarRange },
@@ -35,6 +36,7 @@ export function CommandPalette() {
   const [q, setQ] = useState("");
   const [idx, setIdx] = useState(0);
   const projects = useQuery(api.projects.options, open ? {} : "skip");
+  const chatChannels = useQuery(api.chat.browse, open ? {} : "skip");
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -52,8 +54,12 @@ export function CommandPalette() {
       .filter((p) => needle && p.name.toLowerCase().includes(needle))
       .slice(0, 8)
       .map((p) => ({ label: p.name, href: `/projekty/${p._id}`, icon: FolderKanban, kind: "project" as const, sub: `${PRIORITY_LABEL[p.priority]} · ${STATUS_LABEL[p.status]}` }));
-    return [...projs, ...navItems];
-  }, [q, projects, nav]);
+    const channels = (chatChannels ?? [])
+      .filter((c) => needle && !c.archivedAt && (c.isMember || c.canJoin) && c.name.toLowerCase().includes(needle.replace(/^#/, "")))
+      .slice(0, 5)
+      .map((c) => ({ label: `#${c.name}`, href: `/chat/${c._id}`, icon: Hash, kind: "channel" as const, sub: c.isMember ? "kanál" : "kanál · připojit se" }));
+    return [...projs, ...channels, ...navItems];
+  }, [q, projects, chatChannels, nav]);
 
 
   if (!open) return null;
@@ -71,7 +77,7 @@ export function CommandPalette() {
               if (e.key === "ArrowUp") { e.preventDefault(); setIdx((i) => Math.max(i - 1, 0)); }
               if (e.key === "Enter" && results[idx]) go(results[idx].href);
             }}
-            placeholder="Hledat projekt nebo stránku…"
+            placeholder="Hledat projekt, kanál nebo stránku…"
             className="flex-1 bg-transparent py-3.5 text-sm text-a-text outline-none placeholder:text-a-text-4"
           />
           <kbd className="text-[10px] text-a-text-4 border border-a-border rounded px-1.5 py-0.5">ESC</kbd>

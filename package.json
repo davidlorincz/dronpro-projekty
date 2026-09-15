@@ -33,6 +33,7 @@
     "convex": "1.40.0",
     "date-fns": "^4.1.0",
     "framer-motion": "^12.29.2",
+    "frimousse": "^0.3.0",
     "jotai": "^2.12.5",
     "lodash.throttle": "^4.1.1",
     "lucide-react": "^0.563.0",

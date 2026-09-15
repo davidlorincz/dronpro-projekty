@@ -11,15 +11,9 @@ import { useMe } from "@/components/layout/AuthGuard";
 import { errorToast } from "@/lib/convexError";
 import { formatDateTime, timeAgo } from "@/lib/dates";
 import { cn } from "@/lib/utils";
+import { areaCls, submitOnEnter } from "@/lib/compose";
 
 type EntityType = "project" | "subtask" | "event";
-
-const areaCls = "w-full resize-none rounded-lg border border-a-border bg-a-input px-2.5 py-1.5 text-sm text-a-text outline-none focus:border-cyan-500 placeholder:text-a-text-4";
-
-/** Enter odešle, Shift+Enter nový řádek (a nic neodesílá během skládání znaků IME). */
-function submitOnEnter(e: React.KeyboardEvent<HTMLTextAreaElement>, submit: () => void) {
-  if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); submit(); }
-}
 
 /**
  * Diskuze pod projektem, subúkolem nebo eventem/zakázkou. Čte každý, kdo entitu vidí;

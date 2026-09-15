@@ -134,6 +134,20 @@ export const contactValidator = v.object({
   note: v.optional(v.string()),
 });
 
+// ---- Chat -------------------------------------------------------------------
+
+export const chatKindValidator = v.union(v.literal("channel"), v.literal("dm"));
+export const chatVisibilityValidator = v.union(v.literal("public"), v.literal("private"));
+/** Kdy notifikovat: každá zpráva / jen zmínky / nikdy. */
+export const chatNotifyValidator = v.union(v.literal("all"), v.literal("mentions"), v.literal("none"));
+
+export const chatAttachmentValidator = v.object({
+  storageId: v.id("_storage"),
+  name: v.string(),
+  mimeType: v.string(), // z `_storage` metadat, ne z klienta
+  size: v.number(),
+});
+
 // ---- schéma ----------------------------------------------------------------
 
 export default defineSchema({
@@ -343,6 +357,99 @@ export default defineSchema({
   })
     .index("by_entity", ["entityType", "entityId", "createdAt"])
     .index("by_project", ["projectId", "createdAt"]),
+
+  // ---- Chat (kanály, DM, vlákna) -------------------------------------------
+  // Prefix `chat`, protože `channel` už znamená kanál content plánu.
+  // DM je jen privátní kanál bez názvu s `dmKey` — celá logika čtení,
+  // nepřečtených a notifikací je pro oba druhy společná.
+  chatChannels: defineTable({
+    kind: chatKindValidator,
+    visibility: chatVisibilityValidator, // DM je vždy private
+    name: v.optional(v.string()), // slug, unikátní; jen kanály
+    topic: v.optional(v.string()),
+    description: v.optional(v.string()),
+    /** Seřazená userIds spojená `_` — stejná skupina lidí má jen jedno DM. */
+    dmKey: v.optional(v.string()),
+    /** `#obecne` — automatické členství, nejde opustit ani archivovat. */
+    isDefault: v.optional(v.boolean()),
+    lastMessageAt: v.number(),
+    archivedAt: v.optional(v.number()),
+    createdBy: v.id("users"),
+    createdAt: v.number(),
+  })
+    .index("by_kind", ["kind"])
+    .index("by_name", ["name"])
+    .index("by_dmKey", ["dmKey"])
+    .index("by_default", ["isDefault"]),
+
+  // Členství + osobní stav kanálu. Čítače jsou denormalizované, aby sidebar
+  // nemusel počítat zprávy za běhu.
+  chatMembers: defineTable({
+    channelId: v.id("chatChannels"),
+    userId: v.id("users"),
+    role: v.union(v.literal("owner"), v.literal("member")),
+    joinedAt: v.number(),
+    lastReadAt: v.number(),
+    /** Nepřečtené zmínky (u DM každá zpráva) → červený badge. */
+    mentionCount: v.number(),
+    starred: v.optional(v.boolean()),
+    muted: v.optional(v.boolean()),
+    notify: v.optional(chatNotifyValidator), // default: DM all, kanál mentions
+  })
+    .index("by_user", ["userId"])
+    .index("by_channel", ["channelId"])
+    .index("by_channel_user", ["channelId", "userId"]),
+
+  chatMessages: defineTable({
+    channelId: v.id("chatChannels"),
+    authorId: v.id("users"),
+    /** Tokeny `<@userId>`, `<#channelId>`, `<!kanal>` se na klientu vykreslí jako odkazy. */
+    text: v.string(),
+    parentId: v.optional(v.id("chatMessages")), // odpověď ve vlákně
+    /** Patří do hlavní timeline kanálu: root, nebo odpověď „poslat i do kanálu“. */
+    inChannel: v.boolean(),
+    system: v.optional(v.boolean()), // „David přidal Petra do kanálu“
+    mentions: v.array(v.id("users")),
+    mentionsChannel: v.optional(v.boolean()),
+    // Denormalizované na zprávě — stránkovaný výpis tak nedělá N+1 dotazy.
+    reactions: v.array(v.object({ emoji: v.string(), userIds: v.array(v.id("users")) })),
+    attachments: v.array(chatAttachmentValidator),
+    replyCount: v.number(),
+    lastReplyAt: v.optional(v.number()),
+    replyUserIds: v.array(v.id("users")), // posledních pár odpovídajících (avatary)
+    editedAt: v.optional(v.number()),
+    /** Soft delete jen u rootu s odpověďmi — vlákno musí zůstat dohledatelné. */
+    deletedAt: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_channel_feed", ["channelId", "inChannel"])
+    .index("by_channel", ["channelId"])
+    .index("by_parent", ["parentId"]),
+
+  // Kdo sleduje vlákno (autor rootu, odpovídající, zmínění) → pohled „Vlákna“.
+  chatThreadFollows: defineTable({
+    rootId: v.id("chatMessages"),
+    channelId: v.id("chatChannels"),
+    userId: v.id("users"),
+    unread: v.boolean(),
+    lastReplyAt: v.number(),
+  })
+    .index("by_root", ["rootId"])
+    .index("by_root_user", ["rootId", "userId"])
+    .index("by_user_activity", ["userId", "lastReplyAt"])
+    .index("by_user_unread", ["userId", "unread"])
+    .index("by_channel", ["channelId"]),
+
+  // Pohled „Zmínky“ — pole `mentions` na zprávě se indexovat nedá.
+  chatMentions: defineTable({
+    userId: v.id("users"),
+    messageId: v.id("chatMessages"),
+    channelId: v.id("chatChannels"),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId", "createdAt"])
+    .index("by_message", ["messageId"])
+    .index("by_channel", ["channelId"]),
 
   // In-app notifikace pro konkrétního uživatele.
   notifications: defineTable({

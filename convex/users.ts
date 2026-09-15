@@ -4,6 +4,7 @@ import { getCurrentUser, requireAdmin, requireUser } from "./auth";
 import { departmentValidator, roleValidator } from "./schema";
 import { notifyAdmins } from "./notifications";
 import { applyInvite, findLiveInvite } from "./invites";
+import { deleteUserChatData, joinDefaultChannel } from "./chat";
 
 /** Aktuální uživatel (nebo null). Používá AuthGuard. */
 export const me = query({
@@ -55,6 +56,7 @@ export const ensureCurrentUser = mutation({
       await ctx.db.patch(existing._id, patch);
       const updated = (await ctx.db.get(existing._id))!;
       if (invite) await applyInvite(ctx, updated, invite);
+      await joinDefaultChannel(ctx, updated);
       return updated;
     }
 
@@ -81,6 +83,7 @@ export const ensureCurrentUser = mutation({
       lastSeenAt: Date.now(),
     });
     if (invite) await applyInvite(ctx, (await ctx.db.get(id))!, invite);
+    await joinDefaultChannel(ctx, (await ctx.db.get(id))!);
     // S pozvánkou nikdo na nic nečeká → „čeká na přidělení práv“ nedává smysl.
     if (!isFirst && !invite) {
       await notifyAdmins(ctx, {
@@ -132,6 +135,8 @@ export const updateRole = mutation({
       throw new ConvexError("Nemůžeš si sám odebrat admin roli.");
     }
     await ctx.db.patch(args.userId, { role: args.role, status: "active" });
+    const updated = await ctx.db.get(args.userId);
+    if (updated) await joinDefaultChannel(ctx, updated);
   },
 });
 
@@ -152,6 +157,8 @@ export const setStatus = mutation({
     const me = await requireAdmin(ctx);
     if (me._id === args.userId) throw new ConvexError("Nemůžeš deaktivovat sám sebe.");
     await ctx.db.patch(args.userId, { status: args.status });
+    const updated = await ctx.db.get(args.userId);
+    if (updated) await joinDefaultChannel(ctx, updated);
   },
 });
 
@@ -163,6 +170,7 @@ export const remove = mutation({
     if (me._id === args.userId) throw new ConvexError("Nemůžeš smazat sám sebe.");
     const notifs = await ctx.db.query("notifications").withIndex("by_user", (q) => q.eq("userId", args.userId)).collect();
     for (const n of notifs) await ctx.db.delete(n._id);
+    await deleteUserChatData(ctx, args.userId);
     await ctx.db.delete(args.userId);
   },
 });

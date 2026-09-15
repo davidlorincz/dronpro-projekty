@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, FolderKanban, GanttChartSquare, Users, Settings, Archive, HelpCircle, BellRing, CalendarDays, PartyPopper, Briefcase, CalendarRange } from "lucide-react";
+import { MessagesSquare, LayoutDashboard, FolderKanban, GanttChartSquare, Users, Settings, Archive, HelpCircle, BellRing, CalendarDays, PartyPopper, Briefcase, CalendarRange } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DronProLogo } from "@/components/shared/DronProLogo";
 import { useMe } from "./AuthGuard";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 
-type NavItem = { label: string; href: string; icon: typeof LayoutDashboard; adminOnly?: boolean; exact?: boolean };
+type NavItem = { label: string; href: string; icon: typeof LayoutDashboard; adminOnly?: boolean; exact?: boolean; badge?: "chat" };
 
 const navGroups: { title: string | null; items: NavItem[] }[] = [
   {
@@ -19,6 +21,10 @@ const navGroups: { title: string | null; items: NavItem[] }[] = [
       { label: "Content plán", href: "/content", icon: CalendarDays },
       { label: "Archiv", href: "/archiv", icon: Archive },
     ],
+  },
+  {
+    title: "Komunikace",
+    items: [{ label: "Chat", href: "/chat", icon: MessagesSquare, badge: "chat" }],
   },
   {
     title: "Akce",
@@ -42,9 +48,10 @@ const navGroups: { title: string | null; items: NavItem[] }[] = [
 export function Sidebar() {
   const pathname = usePathname();
   const { isAdmin } = useMe();
+  const chatBadge = useQuery(api.chat.unreadBadge);
 
   return (
-    <aside className="w-60 shrink-0 bg-a-surface border-r border-a-border min-h-screen hidden md:block">
+    <aside className="w-60 shrink-0 bg-a-surface border-r border-a-border min-h-screen hidden md:block overflow-y-auto">
       <div className="p-6">
         <Link href="/" className="flex items-center gap-3 text-[var(--a-heading)]">
           <DronProLogo className="h-6" color="currentColor" />
@@ -72,7 +79,10 @@ export function Sidebar() {
                     )}
                   >
                     <item.icon className="h-5 w-5" />
-                    {item.label}
+                    <span className="flex-1">{item.label}</span>
+                    {item.badge === "chat" && !!chatBadge && (
+                      <span className="rounded-full bg-red-500 px-1.5 text-[10px] font-bold leading-4 text-white">{chatBadge > 99 ? "99+" : chatBadge}</span>
+                    )}
                   </Link>
                 );
               })}

@@ -30,4 +30,27 @@ http.route({
   }),
 });
 
+/** Stažení přílohy chatu — stejný princip jako `/eventFile`; příloha se páruje přes zprávu. */
+http.route({
+  path: "/chatFile",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    const params = new URL(request.url).searchParams;
+    const messageId = params.get("m");
+    const storageId = params.get("s");
+    if (!messageId || !storageId) return new Response("Chybí id", { status: 400 });
+    const file = await ctx.runQuery(internal.chatMessages.forDownload, { messageId, storageId });
+    if (!file) return new Response("Soubor nenalezen", { status: 404 });
+    const blob = await ctx.storage.get(file.storageId);
+    if (!blob) return new Response("Soubor nenalezen", { status: 404 });
+    return new Response(blob, {
+      headers: {
+        "Content-Type": file.mimeType,
+        "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(file.name)}`,
+        "Cache-Control": "private, max-age=3600",
+      },
+    });
+  }),
+});
+
 export default http;

@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { useRouter } from "next/navigation";
 import { api } from "../../../convex/_generated/api";
-import { Bell, CheckCheck, AlertTriangle, Clock, CalendarClock, CalendarDays, CalendarPlus, UserPlus, UserCheck, Settings2, Ban, CheckCircle2, MessageSquare, Flag } from "lucide-react";
+import { Bell, CheckCheck, AlertTriangle, Clock, CalendarClock, CalendarDays, CalendarPlus, UserPlus, UserCheck, Settings2, Ban, CheckCircle2, MessageSquare, Flag, AtSign, MessagesSquare, Hash } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { timeAgo } from "@/lib/dates";
@@ -23,6 +23,11 @@ const typeIcons: Record<string, typeof Bell> = {
   event_assigned: CalendarPlus,
   event_soon: CalendarDays,
   invite_accepted: UserCheck,
+  chat_mention: AtSign,
+  chat_dm: MessageSquare,
+  chat_thread_reply: MessagesSquare,
+  chat_channel_message: Hash,
+  chat_added: Hash,
 };
 const typeColors: Record<string, string> = {
   deadline_changed: "text-blue-500",
@@ -38,6 +43,11 @@ const typeColors: Record<string, string> = {
   event_assigned: "text-emerald-500",
   event_soon: "text-amber-500",
   invite_accepted: "text-violet-500",
+  chat_mention: "text-amber-500",
+  chat_dm: "text-sky-500",
+  chat_thread_reply: "text-sky-500",
+  chat_channel_message: "text-sky-500",
+  chat_added: "text-emerald-500",
 };
 
 export function NotificationPanel() {
