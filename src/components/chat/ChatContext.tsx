@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useMemo, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../convex/_generated/api";
@@ -18,6 +18,8 @@ type ChatCtx = {
   sidebar: FunctionReturnType<typeof api.chat.mySidebar> | undefined;
   channelMap: Map<string, SidebarChannel>;
   userName: (id: Id<"users"> | string) => string;
+  savedIds: Set<string>;
+  isOnline: (id: string) => boolean;
   /** „#marketing“ / „Petr, Jana“ / „Poznámky pro sebe“. */
   channelTitle: (c: { kind: "channel" | "dm"; name?: string; dmUserIds: string[] }) => string;
 };
@@ -30,6 +32,9 @@ export function useChat() {
   return ctx;
 }
 
+/** Online = heartbeat za poslední 2,5 minuty (klient ho posílá každou minutu, když je okno vidět). */
+const ONLINE_MS = 150_000;
+
 export function displayName(u: { name?: string; email: string } | undefined) {
   return u ? u.name || u.email : "Smazaný uživatel";
 }
@@ -38,11 +43,20 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const { me } = useMe();
   const users = useQuery(api.users.list);
   const sidebar = useQuery(api.chat.mySidebar);
+  const saved = useQuery(api.chatExtras.savedIds);
+  const presence = useQuery(api.presence.online);
+  // Query se s plynoucím časem sama nepřepočítá — „online“ vyhodnocujeme proti vlastním hodinám.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, []);
 
   const value = useMemo<ChatCtx>(() => {
     const userMap = new Map((users ?? []).map((u) => [u._id as string, u]));
     const channelMap = new Map((sidebar?.channels ?? []).map((c) => [c._id as string, c]));
     const userName = (id: string) => displayName(userMap.get(id));
+    const online = new Set((presence ?? []).filter((p) => now - p.lastActiveAt < ONLINE_MS).map((p) => p.userId as string));
     return {
       me,
       users: users ?? [],
@@ -50,13 +64,15 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       sidebar,
       channelMap,
       userName,
+      savedIds: new Set((saved ?? []).map(String)),
+      isOnline: (id) => online.has(id),
       channelTitle: (c) => {
         if (c.kind === "channel") return c.name ?? "kanál";
         if (!c.dmUserIds.length) return "Poznámky pro sebe";
         return c.dmUserIds.map(userName).join(", ");
       },
     };
-  }, [me, users, sidebar]);
+  }, [me, users, sidebar, saved, presence, now]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

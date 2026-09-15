@@ -6,7 +6,6 @@ import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { Archive, ArchiveRestore, Crown, LogOut, Lock, MessageCircle, Trash2, UserMinus, X } from "lucide-react";
-import { UserAvatar } from "@/components/shared/UserAvatar";
 import { UserPicker } from "@/components/shared/UserPicker";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useMe } from "@/components/layout/AuthGuard";
@@ -16,6 +15,7 @@ import { areaCls } from "@/lib/compose";
 import { formatDateTime } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 import { displayName, useChat, type ChannelDetail } from "./ChatContext";
+import { PresenceAvatar } from "./PresenceAvatar";
 
 type Confirm = { title: string; description: string; label: string; destructive?: boolean; run: () => Promise<void> };
 
@@ -196,7 +196,7 @@ export function ChannelDetailsPanel({ channel, title, tab, onTab, onClose }: {
               const u = userMap.get(m.userId);
               return (
                 <div key={m.userId} className="group flex items-center gap-2.5 px-4 py-1.5 hover:bg-a-hover">
-                  {u ? <UserAvatar user={u} size="md" /> : <span className="h-8 w-8 rounded-full bg-a-elevated" />}
+                  {u ? <PresenceAvatar user={u} size="md" /> : <span className="h-8 w-8 rounded-full bg-a-elevated" />}
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5 truncate text-sm font-medium text-a-text">
                       {displayName(u)}{m.userId === me._id && <span className="font-normal text-a-text-4">(ty)</span>}

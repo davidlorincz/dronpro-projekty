@@ -50,6 +50,8 @@ export function Composer({
   const { me, userMap, sidebar } = useChat();
   const send = useMutation(api.chatMessages.send);
   const generateUploadUrl = useMutation(api.chatMessages.generateUploadUrl);
+  const setTyping = useMutation(api.presence.setTyping);
+  const typingSentAt = useRef(0);
 
   const [text, setText] = useState(() => readDraft(draftKey));
   const [picked, setPicked] = useState<PickedMentions>(() => new Map());
@@ -76,6 +78,22 @@ export function Composer({
   useEffect(() => {
     if (autoFocus) areaRef.current?.focus();
   }, [autoFocus]);
+
+  // „Píše…“ — nejvýš jednou za 3 s (řádek na serveru žije 6 s), při vymazání a odchodu hned pryč.
+  const reportTyping = (value: string) => {
+    const now = Date.now();
+    if (value.trim()) {
+      if (now - typingSentAt.current < 3000) return;
+      typingSentAt.current = now;
+      void setTyping({ channelId, parentId, typing: true }).catch(() => {});
+    } else if (typingSentAt.current) {
+      typingSentAt.current = 0;
+      void setTyping({ channelId, parentId, typing: false }).catch(() => {});
+    }
+  };
+  useEffect(() => () => {
+    if (typingSentAt.current) void setTyping({ channelId, parentId, typing: false }).catch(() => {});
+  }, [channelId, parentId, setTyping]);
 
   const addFiles = async (files: File[]) => {
     for (const original of files) {
@@ -187,6 +205,7 @@ export function Composer({
       await send({ channelId, text: body, parentId, alsoInChannel: parentId ? alsoInChannel : undefined, attachments });
       setText("");
       writeDraft(draftKey, "");
+      typingSentAt.current = 0; // řádek „píše…“ smazal už `send` na serveru
       setPicked(new Map());
       setPending([]);
       setAlsoInChannel(false);
@@ -256,7 +275,7 @@ export function Composer({
           rows={1}
           value={text}
           placeholder={placeholder}
-          onChange={(e) => { setText(e.target.value); writeDraft(draftKey, e.target.value); setCaret(e.target.selectionStart); setActiveIdx(0); }}
+          onChange={(e) => { setText(e.target.value); writeDraft(draftKey, e.target.value); setCaret(e.target.selectionStart); setActiveIdx(0); reportTyping(e.target.value); }}
           onSelect={(e) => setCaret(e.currentTarget.selectionStart)}
           onKeyDown={onKeyDown}
           onPaste={(e) => {

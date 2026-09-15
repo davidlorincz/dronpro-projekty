@@ -5,7 +5,7 @@ import { useMutation } from "convex/react";
 import * as Popover from "@radix-ui/react-popover";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { CornerDownRight, Download, EyeOff, FileText, Link2, MessageSquareReply, MoreHorizontal, Pencil, SmilePlus, Trash2, Info } from "lucide-react";
+import { Bookmark, BookmarkCheck, CornerDownRight, Download, EyeOff, FileText, Link2, MessageSquareReply, MoreHorizontal, Pencil, Pin, PinOff, SmilePlus, Trash2, Info } from "lucide-react";
 import { UserAvatar, UserAvatars } from "@/components/shared/UserAvatar";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { errorToast } from "@/lib/convexError";
@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { displayName, useChat, type ChatMessage } from "./ChatContext";
 import { EmojiPicker } from "./EmojiPicker";
 import { InlineText, MessageText } from "./MessageText";
+import { LinkPreviews } from "./LinkPreviews";
 import { QUICK_REACTIONS } from "./emoji";
 import { decodeMessage, encodeMessage, pluralReplies } from "./tokens";
 
@@ -42,11 +43,13 @@ export function MessageItem({
   onOpenThread?: (rootId: Id<"chatMessages">) => void;
   onMarkedUnread?: () => void;
 }) {
-  const { me, userMap, userName, channelMap } = useChat();
+  const { me, userMap, userName, channelMap, savedIds } = useChat();
   const toggleReaction = useMutation(api.chatMessages.toggleReaction);
   const edit = useMutation(api.chatMessages.edit);
   const remove = useMutation(api.chatMessages.remove);
   const markUnread = useMutation(api.chat.markUnread);
+  const togglePin = useMutation(api.chatExtras.togglePin);
+  const toggleSaved = useMutation(api.chatExtras.toggleSaved);
   const [menuOpen, setMenuOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -55,6 +58,14 @@ export function MessageItem({
   const author = userMap.get(m.authorId);
   const mine = m.authorId === me._id;
   const deleted = !!m.deletedAt;
+  const saved = savedIds.has(m._id);
+
+  const save = async () => {
+    try {
+      const now = await toggleSaved({ messageId: m._id });
+      toast(now ? "Uloženo — najdeš ji v Uložených" : "Odebráno z uložených", "success");
+    } catch (e) { errorToast(e); }
+  };
 
   const react = async (emoji: string) => {
     try { await toggleReaction({ messageId: m._id, emoji }); } catch (e) { errorToast(e); }
@@ -99,6 +110,7 @@ export function MessageItem({
       className={cn(
         "group relative flex gap-3 px-4 transition-colors hover:bg-a-hover",
         compact ? "py-0.5" : "pt-2 pb-0.5",
+        m.pinnedAt && !deleted && "shadow-[inset_3px_0_0_0_#f59e0b]",
         highlighted && "bg-amber-100/60 hover:bg-amber-100/60",
         editing && "bg-a-accent-bg/40 hover:bg-a-accent-bg/40",
       )}
@@ -116,6 +128,12 @@ export function MessageItem({
       </div>
 
       <div className="min-w-0 flex-1">
+        {!deleted && (m.pinnedAt || saved) && (
+          <div className="flex items-center gap-3 text-[11px] font-medium">
+            {m.pinnedAt && <span className="inline-flex items-center gap-1 text-amber-600" title={m.pinnedBy ? `Připnul(a) ${userName(m.pinnedBy)}` : undefined}><Pin className="h-3 w-3" /> Připnuto</span>}
+            {saved && <span className="inline-flex items-center gap-1 text-a-accent-text"><BookmarkCheck className="h-3 w-3" /> Uloženo</span>}
+          </div>
+        )}
         {!compact && (
           <div className="flex items-baseline gap-2">
             <span className="truncate text-sm font-semibold text-a-text">{displayName(author)}</span>
@@ -153,6 +171,7 @@ export function MessageItem({
           <>
             <MessageText text={m.text} />
             {m.editedAt && <span className="text-[10px] text-a-text-4" title={formatDateTime(m.editedAt)}> (upraveno)</span>}
+            <LinkPreviews text={m.text} />
           </>
         )}
 
@@ -218,7 +237,7 @@ export function MessageItem({
         )}
       </div>
 
-      {!deleted && !editing && (canWrite || mine || canModerate) && (
+      {!deleted && !editing && (
         <div className={cn(
           "absolute -top-3.5 right-4 z-10 items-center gap-0.5 rounded-lg border border-a-border bg-a-surface p-0.5 shadow-sm",
           toolbarVisible ? "flex" : "hidden group-hover:flex",
@@ -236,6 +255,9 @@ export function MessageItem({
               <MessageSquareReply className="h-4 w-4" />
             </button>
           )}
+          <button type="button" onClick={() => void save()} className={cn(toolBtn, saved && "text-a-accent-text")} title={saved ? "Odebrat z uložených" : "Uložit na později"}>
+            {saved ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
+          </button>
           <Popover.Root open={menuOpen} onOpenChange={setMenuOpen}>
             <Popover.Trigger asChild>
               <button type="button" className={toolBtn} title="Další akce"><MoreHorizontal className="h-4 w-4" /></button>
@@ -246,6 +268,12 @@ export function MessageItem({
                   <MenuItem icon={Pencil} label="Upravit zprávu" onClick={() => { setMenuOpen(false); onStartEdit(); }} />
                 )}
                 <MenuItem icon={Link2} label="Zkopírovat odkaz" onClick={() => { setMenuOpen(false); void copyLink(); }} />
+                {canWrite && (
+                  <MenuItem icon={m.pinnedAt ? PinOff : Pin} label={m.pinnedAt ? "Odepnout z kanálu" : "Připnout do kanálu"} onClick={async () => {
+                    setMenuOpen(false);
+                    try { await togglePin({ messageId: m._id }); } catch (e) { errorToast(e); }
+                  }} />
+                )}
                 {!inThread && onMarkedUnread && (
                   <MenuItem icon={EyeOff} label="Označit jako nepřečtené" onClick={async () => {
                     setMenuOpen(false);

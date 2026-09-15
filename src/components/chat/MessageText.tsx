@@ -38,7 +38,7 @@ function useInline(noLinks = false) {
       if (start > last) out.push(text.slice(last, start));
       const key = `${keyPrefix}-${i++}`;
       if (m[1]) {
-        out.push(<code key={key} className="rounded bg-a-elevated px-1 py-0.5 font-mono text-[0.85em] text-rose-600 dark:text-rose-400">{m[1].slice(1, -1)}</code>);
+        out.push(<code key={key} className="rounded bg-a-elevated px-1 py-0.5 font-mono text-[0.85em] text-rose-500">{m[1].slice(1, -1)}</code>);
       } else if (m[2]) {
         const mine = m[2] === me._id;
         out.push(

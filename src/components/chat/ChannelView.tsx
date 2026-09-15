@@ -7,8 +7,8 @@ import { useMutation, useQuery } from "convex/react";
 import * as Popover from "@radix-ui/react-popover";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { ArrowLeft, Bell, BellOff, Check, Hash, Info, Loader2, Lock, Star, Upload } from "lucide-react";
-import { UserAvatar, UserAvatars } from "@/components/shared/UserAvatar";
+import { ArrowLeft, Bell, BellOff, Check, Hash, Info, Loader2, Lock, Paperclip, Pin, Search, Star, Upload } from "lucide-react";
+import { UserAvatars } from "@/components/shared/UserAvatar";
 import { errorToast } from "@/lib/convexError";
 import { formatDateTime } from "@/lib/dates";
 import { cn } from "@/lib/utils";
@@ -17,6 +17,9 @@ import { ChannelDetailsPanel } from "./ChannelDetailsPanel";
 import { Composer, type ComposerHandle } from "./Composer";
 import { MessageList } from "./MessageList";
 import { ThreadPanel } from "./ThreadPanel";
+import { FilesPanel, PinnedPanel } from "./ChannelSidePanels";
+import { PresenceAvatar } from "./PresenceAvatar";
+import { TypingIndicator } from "./TypingIndicator";
 
 export const LAST_CHANNEL_KEY = "chat-last-channel";
 
@@ -47,9 +50,12 @@ function ChannelInner({ channel }: { channel: ChannelDetail }) {
   const markRead = useMutation(api.chat.markRead);
   const join = useMutation(api.chat.join);
   const setPrefs = useMutation(api.chat.setPrefs);
+  const typingRows = useQuery(api.presence.typing, channel.canRead ? { channelId: channel._id } : "skip");
 
   const threadId = params.get("vlakno");
-  const detailTab = params.get("detail") as "about" | "members" | null;
+  const detailParam = params.get("detail");
+  const detailTab = detailParam === "about" || detailParam === "members" ? detailParam : null;
+  const sidePanel = detailParam === "pinned" || detailParam === "files" ? detailParam : null;
   const highlightId = params.get("zprava");
 
   const [initialLastReadAt] = useState(() => channel.membership?.lastReadAt ?? Date.now());
@@ -95,21 +101,29 @@ function ChannelInner({ channel }: { channel: ChannelDetail }) {
 
   const openThread = useCallback((rootId: Id<"chatMessages">) => setParam("vlakno", rootId), [setParam]);
   const closePanel = useCallback(() => setParam("vlakno", null), [setParam]);
+  const jumpTo = useCallback((messageId: string, parentId?: string) => {
+    if (parentId) setParam("vlakno", parentId);
+    else setParam("zprava", messageId);
+  }, [setParam]);
 
   // Esc zavře panel; když žádný není, označí kanál jako přečtený.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented) return;
       if (document.querySelector("[role=dialog]")) return;
-      if (threadId || detailTab) closePanel();
+      if (threadId || detailParam) closePanel();
       else if (isMember) { setSuppressRead(false); void markRead({ channelId: channel._id }); }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [threadId, detailTab, closePanel, isMember, markRead, channel._id]);
+  }, [threadId, detailParam, closePanel, isMember, markRead, channel._id]);
 
   const panel = threadId ? (
-    <ThreadPanel key={threadId} rootId={threadId} channel={channel} title={title} onClose={closePanel} />
+    <ThreadPanel key={threadId} rootId={threadId} channel={channel} title={title} onClose={closePanel} typingRows={typingRows} />
+  ) : sidePanel === "pinned" ? (
+    <PinnedPanel channel={channel} title={title} onClose={closePanel} onJump={jumpTo} />
+  ) : sidePanel === "files" ? (
+    <FilesPanel channel={channel} title={title} onClose={closePanel} onJump={jumpTo} />
   ) : detailTab ? (
     <ChannelDetailsPanel channel={channel} title={title} tab={detailTab} onTab={(t) => setParam("detail", t)} onClose={closePanel} />
   ) : null;
@@ -135,7 +149,7 @@ function ChannelInner({ channel }: { channel: ChannelDetail }) {
             {channel.kind === "channel" ? (
               channel.visibility === "private" ? <Lock className="h-4 w-4 shrink-0 text-a-text-3" /> : <Hash className="h-4 w-4 shrink-0 text-a-text-3" />
             ) : dmUserIds.length === 1 && userMap.get(dmUserIds[0]) ? (
-              <UserAvatar user={userMap.get(dmUserIds[0])!} size="sm" />
+              <PresenceAvatar user={userMap.get(dmUserIds[0])!} size="sm" />
             ) : null}
             <span className="truncate font-semibold text-a-text">{title}</span>
           </button>
@@ -148,7 +162,7 @@ function ChannelInner({ channel }: { channel: ChannelDetail }) {
               <Star className={cn("h-4 w-4", channel.membership?.starred && "fill-amber-400 text-amber-400")} />
             </button>
           )}
-          {channel.topic && (
+          {channel.topic && !panel && (
             <button type="button" onClick={() => setParam("detail", "about")} className="hidden min-w-0 truncate border-l border-a-border pl-3 text-sm text-a-text-3 hover:text-a-text lg:block cursor-pointer">
               {channel.topic}
             </button>
@@ -159,6 +173,19 @@ function ChannelInner({ channel }: { channel: ChannelDetail }) {
                 <UserAvatars users={channel.members.slice(0, 3).map((m) => userMap.get(m.userId)).filter((u): u is NonNullable<typeof u> => !!u)} size="xs" max={3} />
                 <span className="text-xs font-medium text-a-text-3">{channel.members.length}</span>
               </button>
+            )}
+            {channel.canRead && (
+              <>
+                <Link href={`/chat/hledat?v=${channel._id}`} className="hidden rounded-lg p-1.5 text-a-text-3 hover:bg-a-hover sm:block" title="Hledat v konverzaci">
+                  <Search className="h-4 w-4" />
+                </Link>
+                <button type="button" onClick={() => setParam("detail", sidePanel === "pinned" ? null : "pinned")} className={cn("rounded-lg p-1.5 hover:bg-a-hover cursor-pointer", sidePanel === "pinned" ? "text-a-accent-text" : "text-a-text-3")} title="Připnuté zprávy">
+                  <Pin className="h-4 w-4" />
+                </button>
+                <button type="button" onClick={() => setParam("detail", sidePanel === "files" ? null : "files")} className={cn("rounded-lg p-1.5 hover:bg-a-hover cursor-pointer", sidePanel === "files" ? "text-a-accent-text" : "text-a-text-3")} title="Soubory">
+                  <Paperclip className="h-4 w-4" />
+                </button>
+              </>
             )}
             {isMember && channel.membership && <NotifyMenu channel={channel} />}
             <button type="button" onClick={() => setParam("detail", detailTab ? null : "about")} className={cn("rounded-lg p-1.5 hover:bg-a-hover cursor-pointer", detailTab ? "text-a-accent-text" : "text-a-text-3")} title="Detail kanálu">
@@ -212,6 +239,8 @@ function ChannelInner({ channel }: { channel: ChannelDetail }) {
                 )}
               </div>
             ) : (
+              <>
+              <TypingIndicator rows={typingRows} />
               <Composer
                 ref={composerRef}
                 channelId={channel._id}
@@ -222,6 +251,7 @@ function ChannelInner({ channel }: { channel: ChannelDetail }) {
                 onEditLast={() => setEditLastSignal(Date.now())}
                 autoFocus
               />
+              </>
             )}
           </div>
         )}

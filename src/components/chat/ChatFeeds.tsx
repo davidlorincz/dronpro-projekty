@@ -1,15 +1,19 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useQuery } from "convex/react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { ArrowLeft, AtSign, Hash, Loader2, MessagesSquare, Paperclip } from "lucide-react";
+import type { Id } from "../../../convex/_generated/dataModel";
+import { ArrowLeft, AtSign, Bookmark, BookmarkX, Hash, Loader2, MessagesSquare, Paperclip, Search, X } from "lucide-react";
+import { errorToast } from "@/lib/convexError";
 import { UserAvatar } from "@/components/shared/UserAvatar";
 import { formatDateTime, timeAgo } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 import { displayName, useChat } from "./ChatContext";
 import { InlineText } from "./MessageText";
-import { pluralReplies } from "./tokens";
+import { fold, pluralReplies } from "./tokens";
 
 function FeedShell({ icon: Icon, title, children }: { icon: typeof Hash; title: string; children: React.ReactNode }) {
   return (
@@ -90,9 +94,44 @@ export function ThreadsView() {
   );
 }
 
+type FeedItem = {
+  _id: string;
+  channelId: string;
+  channelKind: "channel" | "dm";
+  channelName?: string;
+  parentId?: string;
+  authorId: string;
+  text: string;
+  attachmentCount: number;
+  createdAt: number;
+};
+
+/** Karta zprávy ve výpisech (zmínky, hledání, uložené) — klik skočí na zprávu v konverzaci. */
+function MessageCard({ item, messageId, action }: { item: FeedItem; messageId: string; action?: React.ReactNode }) {
+  const { userMap, channelTitle, channelMap } = useChat();
+  const where = item.channelKind === "channel"
+    ? `#${item.channelName}`
+    : channelTitle({ kind: "dm", dmUserIds: channelMap.get(item.channelId)?.dmUserIds ?? [] });
+  const author = userMap.get(item.authorId);
+  const href = item.parentId ? `/chat/${item.channelId}?vlakno=${item.parentId}` : `/chat/${item.channelId}?zprava=${messageId}`;
+  return (
+    <div className="group relative flex gap-2.5 rounded-2xl border border-a-border bg-a-surface p-4 transition-colors hover:bg-a-hover">
+      {author ? <UserAvatar user={author} size="md" /> : <span className="h-8 w-8 rounded-full bg-a-elevated" />}
+      <Link href={href} className="min-w-0 flex-1 text-sm text-a-text-2 after:absolute after:inset-0 after:content-['']">
+        <div className="flex items-baseline gap-2 pr-8">
+          <span className="font-semibold text-a-text">{displayName(author)}</span>
+          <span className="truncate text-xs text-a-text-4">{item.parentId ? "ve vlákně v " : "v "}{where}</span>
+          <span className="ml-auto shrink-0 text-xs text-a-text-4" title={formatDateTime(item.createdAt)}>{timeAgo(item.createdAt)}</span>
+        </div>
+        <Snippet text={item.text} attachments={item.attachmentCount} />
+      </Link>
+      {action && <div className="absolute right-3 top-3 z-10">{action}</div>}
+    </div>
+  );
+}
+
 export function MentionsView() {
   const mentions = useQuery(api.chatMessages.myMentions);
-  const { userMap, channelTitle, channelMap } = useChat();
 
   return (
     <FeedShell icon={AtSign} title="Zmínky">
@@ -100,26 +139,158 @@ export function MentionsView() {
         <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-a-text-4" /></div>
       ) : mentions.length === 0 ? (
         <div className="py-16 text-center text-sm text-a-text-4">Tady se objeví zprávy, kde tě někdo označí přes @.</div>
-      ) : mentions.map((m) => {
-        const where = m.channelKind === "channel"
-          ? `#${m.channelName}`
-          : channelTitle({ kind: "dm", dmUserIds: channelMap.get(m.channelId)?.dmUserIds ?? [] });
-        const author = userMap.get(m.authorId);
-        const href = m.parentId ? `/chat/${m.channelId}?vlakno=${m.parentId}` : `/chat/${m.channelId}?zprava=${m.messageId}`;
-        return (
-          <Link key={m._id} href={href} className="flex gap-2.5 rounded-2xl border border-a-border bg-a-surface p-4 transition-colors hover:bg-a-hover">
-            {author ? <UserAvatar user={author} size="md" /> : <span className="h-8 w-8 rounded-full bg-a-elevated" />}
-            <div className="min-w-0 flex-1 text-sm text-a-text-2">
-              <div className="flex items-baseline gap-2">
-                <span className="font-semibold text-a-text">{displayName(author)}</span>
-                <span className="text-xs text-a-text-4">{m.parentId ? "ve vlákně v " : "v "}{where}</span>
-                <span className="ml-auto shrink-0 text-xs text-a-text-4" title={formatDateTime(m.createdAt)}>{timeAgo(m.createdAt)}</span>
-              </div>
-              <Snippet text={m.text} attachments={0} />
-            </div>
-          </Link>
-        );
-      })}
+      ) : mentions.map((m) => (
+        <MessageCard key={m._id} messageId={m.messageId} item={{ ...m, attachmentCount: 0 }} />
+      ))}
+    </FeedShell>
+  );
+}
+
+export function SavedView() {
+  const saved = useQuery(api.chatExtras.saved);
+  const toggleSaved = useMutation(api.chatExtras.toggleSaved);
+
+  return (
+    <FeedShell icon={Bookmark} title="Uložené">
+      {saved === undefined ? (
+        <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-a-text-4" /></div>
+      ) : saved.length === 0 ? (
+        <div className="py-16 text-center text-sm text-a-text-4">
+          Zprávy, ke kterým se chceš vrátit, si ulož ikonkou záložky u zprávy. Uložené vidíš jen ty.
+        </div>
+      ) : saved.map((m) => (
+        <MessageCard
+          key={m._id} messageId={m._id} item={m}
+          action={
+            <button
+              type="button" title="Odebrat z uložených"
+              onClick={async () => { try { await toggleSaved({ messageId: m._id }); } catch (e) { errorToast(e); } }}
+              className="rounded-md p-1 text-a-text-4 opacity-0 hover:bg-a-elevated hover:text-a-text group-hover:opacity-100 cursor-pointer"
+            >
+              <BookmarkX className="h-4 w-4" />
+            </button>
+          }
+        />
+      ))}
+    </FeedShell>
+  );
+}
+
+/**
+ * Hledání ve zprávách. Filtry jdou zadat i přímo do textu jako ve Slacku:
+ * `v:#marketing` (kanál) a `od:@petr` (autor).
+ */
+export function SearchView() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const params = useSearchParams();
+  const { users, sidebar, channelTitle } = useChat();
+  const [input, setInput] = useState(params.get("q") ?? "");
+  const [channelId, setChannelId] = useState(params.get("v") ?? "");
+  const [authorId, setAuthorId] = useState(params.get("od") ?? "");
+  const [debounced, setDebounced] = useState(input);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(input), 300);
+    return () => clearTimeout(t);
+  }, [input]);
+
+  const channels = useMemo(() => sidebar?.channels ?? [], [sidebar]);
+
+  // Tokeny v:# a od:@ v textu přepnou filtr a z hledaného textu zmizí.
+  const parsed = useMemo(() => {
+    let q = debounced;
+    let ch = channelId;
+    let au = authorId;
+    for (const m of [...debounced.matchAll(/(^|\s)v:#?([\p{L}\p{N}_-]+)/giu)]) {
+      const c = channels.find((x) => x.kind === "channel" && fold(x.name ?? "") === fold(m[2]));
+      if (!c) continue;
+      ch = c._id;
+      q = q.replace(m[0], m[1]);
+    }
+    for (const m of [...debounced.matchAll(/(^|\s)od:@?([\p{L}\p{N}._-]+)/giu)]) {
+      const needle = fold(m[2]);
+      const u = users.find((x) => x.status === "active"
+        && (fold((x.name ?? "").replace(/\s+/g, "")).startsWith(needle) || fold(x.email.split("@")[0]).startsWith(needle)));
+      if (!u) continue;
+      au = u._id;
+      q = q.replace(m[0], m[1]);
+    }
+    return { q: q.trim(), channelId: ch, authorId: au };
+  }, [debounced, channelId, authorId, channels, users]);
+
+  // Stav do URL — výsledky jdou sdílet a tlačítko Zpět vrátí hledání.
+  useEffect(() => {
+    const next = new URLSearchParams();
+    if (parsed.q) next.set("q", parsed.q);
+    if (parsed.channelId) next.set("v", parsed.channelId);
+    if (parsed.authorId) next.set("od", parsed.authorId);
+    const qs = next.toString();
+    if (qs !== params.toString()) router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }, [parsed, params, pathname, router]);
+
+  const results = useQuery(
+    api.chatExtras.search,
+    parsed.q.length >= 2
+      ? {
+          q: parsed.q,
+          channelId: (parsed.channelId || undefined) as Id<"chatChannels"> | undefined,
+          authorId: (parsed.authorId || undefined) as Id<"users"> | undefined,
+        }
+      : "skip",
+  );
+
+  const selectCls = "rounded-lg border border-a-border bg-a-input px-2.5 py-1.5 text-sm text-a-text outline-none focus:border-cyan-500 cursor-pointer";
+
+  return (
+    <FeedShell icon={Search} title="Hledat ve zprávách">
+      <div className="space-y-2">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-a-text-4" />
+          <input
+            autoFocus value={input} onChange={(e) => setInput(e.target.value)}
+            placeholder="Co hledáš? Např. „faktura v:#eventy od:@monika“"
+            className="w-full rounded-xl border border-a-border bg-a-input py-2.5 pl-9 pr-9 text-sm text-a-text outline-none focus:border-cyan-500 placeholder:text-a-text-4"
+          />
+          {input && (
+            <button type="button" onClick={() => setInput("")} className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-a-text-4 hover:text-a-text cursor-pointer" title="Vymazat">
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <select value={parsed.channelId} onChange={(e) => setChannelId(e.target.value)} className={selectCls}>
+            <option value="">Všechny konverzace</option>
+            {channels.map((c) => (
+              <option key={c._id} value={c._id}>{c.kind === "channel" ? `#${c.name}` : channelTitle(c)}</option>
+            ))}
+          </select>
+          <select value={parsed.authorId} onChange={(e) => setAuthorId(e.target.value)} className={selectCls}>
+            <option value="">Kdokoli</option>
+            {users.filter((u) => u.status === "active").map((u) => (
+              <option key={u._id} value={u._id}>{displayName(u)}</option>
+            ))}
+          </select>
+          {(parsed.channelId || parsed.authorId) && (
+            <button type="button" onClick={() => { setChannelId(""); setAuthorId(""); }} className="text-xs font-medium text-a-accent-text hover:underline cursor-pointer">
+              Zrušit filtry
+            </button>
+          )}
+        </div>
+      </div>
+
+      {parsed.q.length < 2 ? (
+        <div className="py-12 text-center text-sm text-a-text-4">Napiš aspoň dva znaky. Hledá se ve všech konverzacích, které vidíš.</div>
+      ) : results === undefined ? (
+        <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-a-text-4" /></div>
+      ) : results.length === 0 ? (
+        <div className="py-12 text-center text-sm text-a-text-4">Nic nenalezeno pro „{parsed.q}“.</div>
+      ) : (
+        <>
+          <div className="text-xs text-a-text-4">{results.length >= 50 ? "Prvních 50 výsledků — zkus hledání upřesnit." : `Nalezeno: ${results.length}`}</div>
+          {results.map((m) => <MessageCard key={m._id} messageId={m._id} item={m} />)}
+        </>
+      )}
     </FeedShell>
   );
 }

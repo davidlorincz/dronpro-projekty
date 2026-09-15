@@ -11,12 +11,14 @@ import { Composer } from "./Composer";
 import { MessageItem } from "./MessageItem";
 import { isCompact } from "./MessageList";
 import { pluralReplies } from "./tokens";
+import { TypingIndicator, type TypingRow } from "./TypingIndicator";
 
-export function ThreadPanel({ rootId, channel, title, onClose }: {
+export function ThreadPanel({ rootId, channel, title, onClose, typingRows }: {
   rootId: string;
   channel: ChannelDetail;
   title: string;
   onClose: () => void;
+  typingRows: TypingRow[] | undefined;
 }) {
   const { me } = useChat();
   const data = useQuery(api.chatMessages.thread, { rootId });
@@ -87,6 +89,7 @@ export function ThreadPanel({ rootId, channel, title, onClose }: {
           </div>
           {canWrite && (
             <div className="shrink-0 px-3 pb-3">
+              <TypingIndicator rows={typingRows} parentId={rootId} />
               <Composer
                 key={rootId}
                 channelId={channel._id}

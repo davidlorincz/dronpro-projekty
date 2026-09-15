@@ -87,18 +87,50 @@ export function MessageList({
     if (value) setNewBelow(false);
   };
 
-  // Udržení pozice: první načtení → dolů (nebo na odkazovanou zprávu), starší
-  // stránka nahoře → zachovat, co uživatel vidí, nová zpráva dole → dojet, jen když byl dole.
+  // Skok na konkrétní zprávu (odkaz z notifikace, hledání, pinu) — dočítáme starší
+  // stránky, dokud se neobjeví. Odpovědi ve vlákně sem nepatří, ty otevírá volající.
+  const pendingJump = useRef<string | null>(highlightId);
+  const jumpPages = useRef(0);
+  const [jumpSignal, setJumpSignal] = useState(0);
+  useEffect(() => {
+    if (!highlightId) return;
+    pendingJump.current = highlightId;
+    jumpPages.current = 0;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- nový cíl skoku z URL
+    setJumpSignal((n) => n + 1);
+  }, [highlightId]);
+
+  // Udržení pozice: první načtení → dolů, starší stránka nahoře → zachovat, co
+  // uživatel vidí, nová zpráva dole → dojet, jen když byl dole.
   useLayoutEffect(() => {
     const el = scrollRef.current;
     if (!el || !items.length) return;
     const first = items[0]._id as string;
     const last = items[items.length - 1];
+    const remember = () => { prevFirst.current = first; prevLast.current = last._id; };
+
+    if (pendingJump.current) {
+      const target = document.getElementById(`msg-${pendingJump.current}`);
+      if (target) {
+        target.scrollIntoView({ block: "center" });
+        atBottom.current = false; // ať ResizeObserver po dočtení obrázků neujede dolů
+        pendingJump.current = null;
+        initialized.current = true;
+        heightBeforeLoad.current = 0;
+      } else if (status === "CanLoadMore" && jumpPages.current < 20) {
+        jumpPages.current++;
+        loadMore(PAGE * 2);
+      } else if (status === "Exhausted" || jumpPages.current >= 20) {
+        pendingJump.current = null; // zpráva mezitím zmizela — zůstaň, kde jsi
+        if (!initialized.current) { initialized.current = true; scrollToBottom(); }
+      }
+      remember();
+      return;
+    }
+
     if (!initialized.current) {
       initialized.current = true;
-      const target = highlightId ? document.getElementById(`msg-${highlightId}`) : null;
-      if (target) target.scrollIntoView({ block: "center" });
-      else scrollToBottom();
+      scrollToBottom();
     } else if (first !== prevFirst.current && heightBeforeLoad.current) {
       el.scrollTop += el.scrollHeight - heightBeforeLoad.current;
       heightBeforeLoad.current = 0;
@@ -106,9 +138,8 @@ export function MessageList({
       if (atBottom.current || last.authorId === me._id) scrollToBottom();
       else setNewBelow(true);
     }
-    prevFirst.current = first;
-    prevLast.current = last._id;
-  }, [items, highlightId, me._id]);
+    remember();
+  }, [items, status, jumpSignal, loadMore, me._id]);
 
   // Obrázky se dočítají až po vykreslení — když je uživatel dole, drž ho dole.
   useEffect(() => {
@@ -133,7 +164,7 @@ export function MessageList({
     const el = scrollRef.current;
     if (!el) return;
     setBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 80);
-    if (el.scrollTop < 400 && status === "CanLoadMore") {
+    if (el.scrollTop < 400 && status === "CanLoadMore" && !pendingJump.current) {
       heightBeforeLoad.current = el.scrollHeight;
       loadMore(PAGE);
     }

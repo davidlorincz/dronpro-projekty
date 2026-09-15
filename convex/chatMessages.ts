@@ -103,7 +103,7 @@ async function channelLabel(ctx: Ctx, channel: Doc<"chatChannels">) {
   return members.length > 2 ? "skupinové zprávě" : "přímé zprávě";
 }
 
-async function withUrls(ctx: Ctx, m: Doc<"chatMessages">) {
+export async function withUrls(ctx: Ctx, m: Doc<"chatMessages">) {
   return {
     ...m,
     attachments: await Promise.all(
@@ -131,8 +131,12 @@ async function upsertFollow(ctx: MutationCtx, root: Doc<"chatMessages">, userId:
   else await ctx.db.insert("chatThreadFollows", { rootId: root._id, channelId: root.channelId, userId, ...patch });
 }
 
+/** Zmínky a uložení mizí se zprávou (i se soft-smazaným rootem — obsah už není). */
 async function deleteMentionRows(ctx: MutationCtx, messageId: Id<"chatMessages">) {
   for (const r of await ctx.db.query("chatMentions").withIndex("by_message", (q) => q.eq("messageId", messageId)).collect()) {
+    await ctx.db.delete(r._id);
+  }
+  for (const r of await ctx.db.query("chatSaved").withIndex("by_message", (q) => q.eq("messageId", messageId)).collect()) {
     await ctx.db.delete(r._id);
   }
 }
@@ -304,6 +308,11 @@ export const send = mutation({
     for (const uid of mentions) {
       await ctx.db.insert("chatMentions", { userId: uid, messageId, channelId: channel._id, createdAt: now });
     }
+    const typing = await ctx.db
+      .query("chatTyping")
+      .withIndex("by_user_channel", (q) => q.eq("userId", me._id).eq("channelId", channel._id))
+      .unique();
+    if (typing) await ctx.db.delete(typing._id);
 
     const who = me.name ?? me.email;
     const where = await channelLabel(ctx, channel);
@@ -421,7 +430,9 @@ export const remove = mutation({
 
     // Root s odpověďmi zůstává jako „Zpráva byla smazána“, jinak by vlákno osiřelo.
     if (!msg.parentId && msg.replyCount > 0) {
-      await ctx.db.patch(msg._id, { text: "", attachments: [], reactions: [], mentions: [], deletedAt: Date.now() });
+      await ctx.db.patch(msg._id, {
+        text: "", attachments: [], reactions: [], mentions: [], pinnedAt: undefined, pinnedBy: undefined, deletedAt: Date.now(),
+      });
       return;
     }
     await ctx.db.delete(msg._id);

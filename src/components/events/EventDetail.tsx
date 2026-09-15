@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { ShareToChatButton } from "@/components/chat/ShareToChat";
 import { useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../convex/_generated/api";
@@ -101,9 +102,12 @@ export function EventDetail({ id, kind: routeKind }: { id: Id<"events">; kind: E
 
   return (
     <div className="space-y-4">
-      <Link href={EVENT_KIND_PATH[kind]} className="inline-flex items-center gap-1 text-sm text-a-text-3 hover:text-a-text cursor-pointer">
-        <ArrowLeft className="h-4 w-4" /> {EVENT_KIND_PLURAL[kind]}
-      </Link>
+      <div className="flex items-center gap-2">
+        <Link href={EVENT_KIND_PATH[kind]} className="inline-flex items-center gap-1 text-sm text-a-text-3 hover:text-a-text cursor-pointer">
+          <ArrowLeft className="h-4 w-4" /> {EVENT_KIND_PLURAL[kind]}
+        </Link>
+        <ShareToChatButton path={`${EVENT_KIND_PATH[kind]}/${e._id}`} name={e.name} className="ml-auto" />
+      </div>
 
       {e.archivedAt && (
         <div className="card p-3 text-sm text-a-text-2 flex items-center gap-2">

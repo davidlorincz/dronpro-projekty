@@ -106,6 +106,15 @@ export async function deleteUserChatData(ctx: MutationCtx, userId: Id<"users">) 
   for (const m of await ctx.db.query("chatMentions").withIndex("by_user", (q) => q.eq("userId", userId)).collect()) {
     await ctx.db.delete(m._id);
   }
+  for (const r of await ctx.db.query("chatSaved").withIndex("by_user", (q) => q.eq("userId", userId)).collect()) {
+    await ctx.db.delete(r._id);
+  }
+  for (const r of await ctx.db.query("chatTyping").withIndex("by_user_channel", (q) => q.eq("userId", userId)).collect()) {
+    await ctx.db.delete(r._id);
+  }
+  for (const r of await ctx.db.query("presence").withIndex("by_user", (q) => q.eq("userId", userId)).collect()) {
+    await ctx.db.delete(r._id);
+  }
 }
 
 // ---- queries ---------------------------------------------------------------
@@ -420,7 +429,7 @@ export const hardDelete = mutation({
       await deleteChatBlobs(ctx, m.attachments);
       await ctx.db.delete(m._id);
     }
-    for (const table of ["chatMembers", "chatThreadFollows", "chatMentions"] as const) {
+    for (const table of ["chatMembers", "chatThreadFollows", "chatMentions", "chatSaved", "chatTyping"] as const) {
       const rows = await ctx.db.query(table).withIndex("by_channel", (q) => q.eq("channelId", channel._id)).collect();
       for (const r of rows) await ctx.db.delete(r._id);
     }

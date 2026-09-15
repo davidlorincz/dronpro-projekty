@@ -4,11 +4,11 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import * as Popover from "@radix-ui/react-popover";
-import { AtSign, BellOff, ChevronDown, Compass, Hash, Lock, MessagesSquare, Plus, SquarePen, Star } from "lucide-react";
-import { UserAvatar } from "@/components/shared/UserAvatar";
+import { AtSign, BellOff, Bookmark, ChevronDown, Compass, Hash, Lock, MessagesSquare, Plus, Search, SquarePen, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useChat, type SidebarChannel } from "./ChatContext";
 import { BrowseChannelsDialog, CreateChannelDialog, NewMessageDialog } from "./ChatDialogs";
+import { PresenceAvatar } from "./PresenceAvatar";
 
 const COLLAPSE_KEY = "chat-sidebar-collapsed";
 
@@ -54,7 +54,9 @@ export function ChatSidebar() {
       <nav className="min-h-0 flex-1 overflow-y-auto px-2 py-3">
         <div className="mb-3 space-y-0.5">
           <NavRow href="/chat/vlakna" active={pathname === "/chat/vlakna"} icon={MessagesSquare} label="Vlákna" unread={!!sidebar?.unreadThreads} badge={sidebar?.unreadThreads} />
+          <NavRow href="/chat/hledat" active={pathname === "/chat/hledat"} icon={Search} label="Hledat" />
           <NavRow href="/chat/zminky" active={pathname === "/chat/zminky"} icon={AtSign} label="Zmínky" />
+          <NavRow href="/chat/ulozene" active={pathname === "/chat/ulozene"} icon={Bookmark} label="Uložené" />
         </div>
 
         {sidebar === undefined ? (
@@ -173,7 +175,7 @@ function ChannelRow({ c, active }: { c: SidebarChannel; active: boolean }) {
       ) : c.dmUserIds.length > 1 ? (
         <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-a-elevated text-[10px] font-bold text-a-text-3">{c.dmUserIds.length}</span>
       ) : first ? (
-        <UserAvatar user={first} size="xs" />
+        <PresenceAvatar user={first} size="xs" />
       ) : (
         <Star className="h-4 w-4 shrink-0 opacity-70" />
       )}

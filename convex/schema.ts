@@ -420,11 +420,46 @@ export default defineSchema({
     editedAt: v.optional(v.number()),
     /** Soft delete jen u rootu s odpověďmi — vlákno musí zůstat dohledatelné. */
     deletedAt: v.optional(v.number()),
+    pinnedAt: v.optional(v.number()),
+    pinnedBy: v.optional(v.id("users")),
     createdAt: v.number(),
   })
     .index("by_channel_feed", ["channelId", "inChannel"])
     .index("by_channel", ["channelId"])
-    .index("by_parent", ["parentId"]),
+    .index("by_parent", ["parentId"])
+    .index("by_channel_pinned", ["channelId", "pinnedAt"])
+    // Výsledky se vždy filtrují přes `canReadChannel` — index sám o přístupu nic neví.
+    .searchIndex("search_text", { searchField: "text", filterFields: ["channelId", "authorId"] }),
+
+  // Uložené zprávy („přečtu později“) — osobní, nikdo jiný je nevidí.
+  chatSaved: defineTable({
+    userId: v.id("users"),
+    messageId: v.id("chatMessages"),
+    channelId: v.id("chatChannels"),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId", "createdAt"])
+    .index("by_user_message", ["userId", "messageId"])
+    .index("by_message", ["messageId"])
+    .index("by_channel", ["channelId"]),
+
+  // „Píše…“ — krátkodobé řádky s `expiresAt`, klient je filtruje podle vlastních hodin.
+  chatTyping: defineTable({
+    channelId: v.id("chatChannels"),
+    userId: v.id("users"),
+    parentId: v.optional(v.id("chatMessages")), // píše ve vlákně
+    expiresAt: v.number(),
+  })
+    .index("by_channel", ["channelId"])
+    .index("by_user_channel", ["userId", "channelId"])
+    .index("by_expires", ["expiresAt"]),
+
+  // Online tečky. Samostatná tabulka, NE pole na `users`: heartbeat každou minutu
+  // by jinak invalidoval každý dotaz, který čte uživatele (users.list, loadUserMap…).
+  presence: defineTable({
+    userId: v.id("users"),
+    lastActiveAt: v.number(),
+  }).index("by_user", ["userId"]),
 
   // Kdo sleduje vlákno (autor rootu, odpovídající, zmínění) → pohled „Vlákna“.
   chatThreadFollows: defineTable({
