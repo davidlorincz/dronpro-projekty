@@ -1,8 +1,9 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { MessagesSquare, LayoutDashboard, FolderKanban, GanttChartSquare, Users, Settings, Archive, HelpCircle, BellRing, CalendarDays, PartyPopper, Briefcase, CalendarRange } from "lucide-react";
+import { PanelLeftClose, MessagesSquare, LayoutDashboard, FolderKanban, GanttChartSquare, Users, Settings, Archive, HelpCircle, BellRing, CalendarDays, PartyPopper, Briefcase, CalendarRange } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DronProLogo } from "@/components/shared/DronProLogo";
 import { useMe } from "./AuthGuard";
@@ -45,18 +46,66 @@ const navGroups: { title: string | null; items: NavItem[] }[] = [
   },
 ];
 
-export function Sidebar() {
+export function Sidebar({ collapsed, mobileOpen, onToggle, onCloseMobile }: {
+  collapsed: boolean;
+  mobileOpen: boolean;
+  onToggle: () => void;
+  onCloseMobile: () => void;
+}) {
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onCloseMobile(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [mobileOpen, onCloseMobile]);
+
+  return (
+    <>
+      {/* Desktop: zasouvá se na nulovou šířku, vnitřek drží pevnou šířku, ať se při animaci nelámou řádky. */}
+      <aside
+        className={cn(
+          "shrink-0 bg-a-surface min-h-screen hidden md:block overflow-hidden transition-[width] duration-200 ease-out",
+          collapsed ? "w-0" : "w-60 border-r border-a-border",
+        )}
+        aria-hidden={collapsed}
+        inert={collapsed}
+      >
+        <div className="w-60 h-full overflow-y-auto">
+          <SidebarContent onToggle={onToggle} />
+        </div>
+      </aside>
+
+      {/* Mobil: vysouvací panel přes obsah. */}
+      {mobileOpen && (
+        <div className="md:hidden fixed inset-0 z-50">
+          <div className="absolute inset-0 bg-black/40" onClick={onCloseMobile} />
+          <aside className="absolute inset-y-0 left-0 w-64 max-w-[85vw] overflow-y-auto bg-a-surface border-r border-a-border shadow-2xl animate-in slide-in-from-left">
+            <SidebarContent onToggle={onCloseMobile} onNavigate={onCloseMobile} />
+          </aside>
+        </div>
+      )}
+    </>
+  );
+}
+
+function SidebarContent({ onToggle, onNavigate }: { onToggle: () => void; onNavigate?: () => void }) {
   const pathname = usePathname();
   const { isAdmin } = useMe();
   const chatBadge = useQuery(api.chat.unreadBadge);
 
   return (
-    <aside className="w-60 shrink-0 bg-a-surface border-r border-a-border min-h-screen hidden md:block overflow-y-auto">
-      <div className="p-6">
-        <Link href="/" className="flex items-center gap-3 text-[var(--a-heading)]">
+    <>
+      <div className="p-6 pr-3 flex items-center gap-2">
+        <Link href="/" onClick={onNavigate} className="flex min-w-0 flex-1 items-center gap-3 text-[var(--a-heading)]">
           <DronProLogo className="h-6" color="currentColor" />
           <span className="text-xs font-medium text-a-text-4 uppercase tracking-wider">Projekty</span>
         </Link>
+        <button
+          type="button" onClick={onToggle} title="Schovat menu (⌘\)"
+          className="rounded-lg p-1.5 text-a-text-4 hover:bg-a-hover hover:text-a-text cursor-pointer"
+        >
+          <PanelLeftClose className="h-4 w-4" />
+        </button>
       </div>
       <nav className="px-4 pb-6 space-y-6">
         {navGroups.map((group) => {
@@ -73,6 +122,7 @@ export function Sidebar() {
                   <Link
                     key={item.href}
                     href={item.href}
+                    onClick={onNavigate}
                     className={cn(
                       "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
                       isActive ? "bg-a-accent-bg text-a-accent-text" : "text-a-text-2 hover:bg-a-hover hover:text-a-text"
@@ -90,7 +140,7 @@ export function Sidebar() {
           );
         })}
       </nav>
-      <div className="px-6 text-[10px] text-a-text-4">⌘K — rychlé hledání</div>
-    </aside>
+      <div className="px-6 pb-6 text-[10px] text-a-text-4">⌘K — rychlé hledání · ⌘\ — schovat menu</div>
+    </>
   );
 }

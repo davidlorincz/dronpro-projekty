@@ -1,15 +1,21 @@
 "use client";
 
 import { useClerk } from "@clerk/nextjs";
-import { LogOut, Sun, Moon, Plus } from "lucide-react";
+import { LogOut, Sun, Moon, Plus, PanelLeftOpen } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { NotificationPanel } from "./NotificationPanel";
 import { useMe } from "./AuthGuard";
 import { ROLE_LABEL } from "@/lib/constants";
 import { UserAvatar } from "@/components/shared/UserAvatar";
+import { cn } from "@/lib/utils";
 
-export function Header({ isDark, onToggleTheme }: { isDark: boolean; onToggleTheme: () => void }) {
+export function Header({ isDark, onToggleTheme, sidebarCollapsed, onToggleSidebar }: {
+  isDark: boolean;
+  onToggleTheme: () => void;
+  sidebarCollapsed: boolean;
+  onToggleSidebar: () => void;
+}) {
   const { me, canCreateProject } = useMe();
   const { signOut } = useClerk();
   const router = useRouter();
@@ -17,6 +23,13 @@ export function Header({ isDark, onToggleTheme }: { isDark: boolean; onToggleThe
   return (
     <header className="h-16 bg-a-surface border-b border-a-border px-4 md:px-6 flex items-center justify-between gap-3">
       <div className="flex items-center gap-3">
+        {/* Na mobilu vždy (otevírá vysouvací menu), na desktopu jen při zasunutém menu. */}
+        <button
+          type="button" onClick={onToggleSidebar} title="Zobrazit menu (⌘\)"
+          className={cn("-ml-1.5 rounded-lg p-1.5 text-a-text-3 hover:bg-a-hover hover:text-a-text cursor-pointer", !sidebarCollapsed && "md:hidden")}
+        >
+          <PanelLeftOpen className="h-5 w-5" />
+        </button>
         <span className="text-xs font-semibold uppercase tracking-widest text-a-text-4 hidden sm:inline">DRONPRO · Řízení projektů</span>
       </div>
       <div className="flex items-center gap-2 md:gap-3">
