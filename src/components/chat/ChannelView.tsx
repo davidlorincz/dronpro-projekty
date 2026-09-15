@@ -7,7 +7,7 @@ import { useMutation, useQuery } from "convex/react";
 import * as Popover from "@radix-ui/react-popover";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { ArrowLeft, Bell, BellOff, Check, Hash, Info, Loader2, Lock, Paperclip, Pin, Search, Star, Upload } from "lucide-react";
+import { ArrowLeft, Bell, BellOff, Check, Hash, Info, Loader2, Lock, Paperclip, Pin, Search, Star, Upload, Clock } from "lucide-react";
 import { UserAvatars } from "@/components/shared/UserAvatar";
 import { errorToast } from "@/lib/convexError";
 import { formatDateTime } from "@/lib/dates";
@@ -46,7 +46,8 @@ function ChannelInner({ channel }: { channel: ChannelDetail }) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
-  const { userMap, channelTitle, me } = useChat();
+  const { userMap, channelTitle, me, scheduled } = useChat();
+  const scheduledHere = scheduled.filter((x) => x.channelId === channel._id).length;
   const markRead = useMutation(api.chat.markRead);
   const join = useMutation(api.chat.join);
   const setPrefs = useMutation(api.chat.setPrefs);
@@ -240,6 +241,11 @@ function ChannelInner({ channel }: { channel: ChannelDetail }) {
               </div>
             ) : (
               <>
+              {scheduledHere > 0 && (
+                <Link href="/chat/naplanovane" className="mb-1 flex items-center gap-1.5 px-1 text-xs text-a-accent-text hover:underline">
+                  <Clock className="h-3.5 w-3.5" /> {scheduledHere === 1 ? "1 naplánovaná zpráva" : `${scheduledHere} naplánované zprávy`} v této konverzaci
+                </Link>
+              )}
               <TypingIndicator rows={typingRows} />
               <Composer
                 ref={composerRef}

@@ -5,7 +5,7 @@ import { useMutation } from "convex/react";
 import * as Popover from "@radix-ui/react-popover";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { Bookmark, BookmarkCheck, CornerDownRight, Download, EyeOff, FileText, Link2, MessageSquareReply, MoreHorizontal, Pencil, Pin, PinOff, SmilePlus, Trash2, Info } from "lucide-react";
+import { Bookmark, BookmarkCheck, CornerDownRight, Download, EyeOff, FileText, Link2, MessageSquareReply, MoreHorizontal, Pencil, Pin, PinOff, SmilePlus, AlarmClock, AlarmClockOff, Trash2, Info } from "lucide-react";
 import { UserAvatar, UserAvatars } from "@/components/shared/UserAvatar";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { errorToast } from "@/lib/convexError";
@@ -18,6 +18,10 @@ import { displayName, useChat, type ChatMessage } from "./ChatContext";
 import { EmojiPicker } from "./EmojiPicker";
 import { InlineText, MessageText } from "./MessageText";
 import { LinkPreviews } from "./LinkPreviews";
+import { EmojiGlyph } from "./EmojiGlyph";
+import { PollCard } from "./Poll";
+import { WhenDialog } from "./WhenDialog";
+import { REMINDER_PRESETS, formatWhen } from "./when";
 import { QUICK_REACTIONS } from "./emoji";
 import { decodeMessage, encodeMessage, pluralReplies } from "./tokens";
 
@@ -43,13 +47,16 @@ export function MessageItem({
   onOpenThread?: (rootId: Id<"chatMessages">) => void;
   onMarkedUnread?: () => void;
 }) {
-  const { me, userMap, userName, channelMap, savedIds } = useChat();
+  const { me, userMap, userName, channelMap, savedIds, reminderByMessage } = useChat();
   const toggleReaction = useMutation(api.chatMessages.toggleReaction);
   const edit = useMutation(api.chatMessages.edit);
   const remove = useMutation(api.chatMessages.remove);
   const markUnread = useMutation(api.chat.markUnread);
   const togglePin = useMutation(api.chatExtras.togglePin);
   const toggleSaved = useMutation(api.chatExtras.toggleSaved);
+  const setReminder = useMutation(api.chatSchedule.setReminder);
+  const cancelReminder = useMutation(api.chatSchedule.cancelReminder);
+  const [reminderOpen, setReminderOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -59,6 +66,7 @@ export function MessageItem({
   const mine = m.authorId === me._id;
   const deleted = !!m.deletedAt;
   const saved = savedIds.has(m._id);
+  const reminder = reminderByMessage.get(m._id);
 
   const save = async () => {
     try {
@@ -128,8 +136,15 @@ export function MessageItem({
       </div>
 
       <div className="min-w-0 flex-1">
-        {!deleted && (m.pinnedAt || saved) && (
+        {!deleted && (m.pinnedAt || saved || reminder) && (
           <div className="flex items-center gap-3 text-[11px] font-medium">
+            {reminder && (
+              <button type="button" title="Zrušit připomínku"
+                onClick={async () => { try { await cancelReminder({ reminderId: reminder._id }); toast("Připomínka zrušena", "success"); } catch (e) { errorToast(e); } }}
+                className="inline-flex items-center gap-1 text-violet-600 hover:line-through cursor-pointer">
+                <AlarmClock className="h-3 w-3" /> Připomenu {formatWhen(reminder.remindAt)}
+              </button>
+            )}
             {m.pinnedAt && <span className="inline-flex items-center gap-1 text-amber-600" title={m.pinnedBy ? `Připnul(a) ${userName(m.pinnedBy)}` : undefined}><Pin className="h-3 w-3" /> Připnuto</span>}
             {saved && <span className="inline-flex items-center gap-1 text-a-accent-text"><BookmarkCheck className="h-3 w-3" /> Uloženo</span>}
           </div>
@@ -169,7 +184,11 @@ export function MessageItem({
           </div>
         ) : (
           <>
-            <MessageText text={m.text} />
+            {m.poll ? (
+              <PollCard message={m} canVote={canWrite} canClose={m.authorId === me._id || canModerate} />
+            ) : (
+              <MessageText text={m.text} />
+            )}
             {m.editedAt && <span className="text-[10px] text-a-text-4" title={formatDateTime(m.editedAt)}> (upraveno)</span>}
             <LinkPreviews text={m.text} />
           </>
@@ -210,7 +229,7 @@ export function MessageItem({
                     reacted ? "border-cyan-500 bg-a-accent-bg text-a-accent-text" : "border-a-border bg-a-surface text-a-text-2 hover:border-a-text-4",
                   )}
                 >
-                  <span className="text-sm leading-none">{r.emoji}</span>
+                  <EmojiGlyph emoji={r.emoji} className="text-sm leading-none" />
                   <span className="font-medium">{r.userIds.length}</span>
                 </button>
               );
@@ -264,10 +283,18 @@ export function MessageItem({
             </Popover.Trigger>
             <Popover.Portal>
               <Popover.Content side="bottom" align="end" sideOffset={4} collisionPadding={12} className="z-[60] w-56 rounded-xl border border-a-border bg-a-surface py-1 shadow-xl">
-                {mine && canWrite && (
+                {mine && canWrite && !m.poll && (
                   <MenuItem icon={Pencil} label="Upravit zprávu" onClick={() => { setMenuOpen(false); onStartEdit(); }} />
                 )}
                 <MenuItem icon={Link2} label="Zkopírovat odkaz" onClick={() => { setMenuOpen(false); void copyLink(); }} />
+                {reminder ? (
+                  <MenuItem icon={AlarmClockOff} label={`Zrušit připomínku (${formatWhen(reminder.remindAt)})`} onClick={async () => {
+                    setMenuOpen(false);
+                    try { await cancelReminder({ reminderId: reminder._id }); } catch (e) { errorToast(e); }
+                  }} />
+                ) : (
+                  <MenuItem icon={AlarmClock} label="Připomenout mi…" onClick={() => { setMenuOpen(false); setReminderOpen(true); }} />
+                )}
                 {canWrite && (
                   <MenuItem icon={m.pinnedAt ? PinOff : Pin} label={m.pinnedAt ? "Odepnout z kanálu" : "Připnout do kanálu"} onClick={async () => {
                     setMenuOpen(false);
@@ -289,6 +316,18 @@ export function MessageItem({
         </div>
       )}
 
+      {reminderOpen && (
+        <WhenDialog
+          title="Připomenout zprávu"
+          description="Pošlu ti upozornění se odkazem na tuhle zprávu."
+          presets={REMINDER_PRESETS}
+          confirmLabel="Nastavit připomínku"
+          onClose={() => setReminderOpen(false)}
+          onPick={async (ts) => {
+            try { await setReminder({ messageId: m._id, remindAt: ts }); toast(`Připomenu ${formatWhen(ts)}`, "success"); } catch (e) { errorToast(e); }
+          }}
+        />
+      )}
       <ConfirmDialog
         open={confirmDelete}
         title="Smazat zprávu?"

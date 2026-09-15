@@ -12,6 +12,7 @@ import {
 import { chatNotifyValidator } from "./schema";
 import { notify } from "./notifications";
 import { deleteChatBlobs } from "./chatMessages";
+import { deleteRemindersBy, deleteScheduledBy } from "./chatSchedule";
 
 export const DEFAULT_CHANNEL_NAME = "obecne";
 const MAX_DM_USERS = 9; // já + 8 dalších
@@ -115,6 +116,8 @@ export async function deleteUserChatData(ctx: MutationCtx, userId: Id<"users">) 
   for (const r of await ctx.db.query("presence").withIndex("by_user", (q) => q.eq("userId", userId)).collect()) {
     await ctx.db.delete(r._id);
   }
+  await deleteRemindersBy(ctx, await ctx.db.query("chatReminders").withIndex("by_user", (q) => q.eq("userId", userId)).collect());
+  await deleteScheduledBy(ctx, await ctx.db.query("chatScheduled").withIndex("by_user", (q) => q.eq("userId", userId)).collect());
 }
 
 // ---- queries ---------------------------------------------------------------
@@ -429,6 +432,8 @@ export const hardDelete = mutation({
       await deleteChatBlobs(ctx, m.attachments);
       await ctx.db.delete(m._id);
     }
+    await deleteRemindersBy(ctx, await ctx.db.query("chatReminders").withIndex("by_channel", (q) => q.eq("channelId", channel._id)).collect());
+    await deleteScheduledBy(ctx, await ctx.db.query("chatScheduled").withIndex("by_channel", (q) => q.eq("channelId", channel._id)).collect());
     for (const table of ["chatMembers", "chatThreadFollows", "chatMentions", "chatSaved", "chatTyping"] as const) {
       const rows = await ctx.db.query(table).withIndex("by_channel", (q) => q.eq("channelId", channel._id)).collect();
       for (const r of rows) await ctx.db.delete(r._id);

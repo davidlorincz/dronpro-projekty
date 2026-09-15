@@ -55,7 +55,7 @@ export const send = internalAction({
       <div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#111827">
         <p style="font-size:12px;letter-spacing:.1em;color:#2626FF;font-weight:700;margin:0 0 16px">DRONPRO · PROJEKTY</p>
         <h1 style="font-size:20px;margin:0 0 12px;color:#111827">${escapeHtml(args.title)}</h1>
-        ${args.body ? `<p style="font-size:14px;line-height:1.5;color:#374151;margin:0 0 20px">${escapeHtml(args.body)}</p>` : ""}
+        ${args.body ? `<p style="font-size:14px;line-height:1.5;color:#374151;margin:0 0 20px;white-space:pre-line">${escapeHtml(args.body)}</p>` : ""}
         <a href="${url}" style="display:inline-block;background:#06B6D4;color:#fff;text-decoration:none;font-weight:600;padding:10px 18px;border-radius:12px;font-size:14px">${escapeHtml(args.cta ?? "Otevřít v aplikaci")}</a>
         ${args.secondaryLink ? `<a href="${escapeHtml(args.secondaryLink.url)}" style="display:inline-block;margin-left:8px;border:1px solid #D1D5DB;color:#374151;text-decoration:none;font-weight:600;padding:9px 17px;border-radius:12px;font-size:14px">${escapeHtml(args.secondaryLink.label)}</a>` : ""}
         <p style="font-size:12px;color:#9CA3AF;margin-top:28px">Tuto zprávu posílá interní nástroj DRONPRO Projekty.</p>

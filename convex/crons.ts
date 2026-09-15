@@ -9,4 +9,7 @@ crons.daily("daily-deadline-check", { hourUTC: 6, minuteUTC: 0 }, internal.notif
 // Chat: prošlé řádky „píše…“ po zavřených oknech.
 crons.interval("chat-typing-cleanup", { minutes: 30 }, internal.presence.cleanupTyping);
 
+// Chat: e-mailový souhrn nepřečtených, všední dny 14:00 UTC (16:00 v létě / 15:00 v zimě).
+crons.daily("chat-digest", { hourUTC: 14, minuteUTC: 0 }, internal.chatDigest.daily);
+
 export default crons;

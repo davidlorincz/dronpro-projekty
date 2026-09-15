@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import * as Popover from "@radix-ui/react-popover";
-import { AtSign, BellOff, Bookmark, ChevronDown, Compass, Hash, Lock, MessagesSquare, Plus, Search, SquarePen, Star } from "lucide-react";
+import { AtSign, BellOff, Bookmark, ChevronDown, Compass, Hash, Lock, MessagesSquare, Plus, Search, SquarePen, Star, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useChat, type SidebarChannel } from "./ChatContext";
 import { BrowseChannelsDialog, CreateChannelDialog, NewMessageDialog } from "./ChatDialogs";
@@ -23,7 +23,7 @@ export function orderSidebar(channels: SidebarChannel[]) {
 
 export function ChatSidebar() {
   const pathname = usePathname();
-  const { sidebar } = useChat();
+  const { sidebar, scheduled } = useChat();
   const [dialog, setDialog] = useState<null | "create" | "browse" | "dm">(null);
   const [addOpen, setAddOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
@@ -57,6 +57,9 @@ export function ChatSidebar() {
           <NavRow href="/chat/hledat" active={pathname === "/chat/hledat"} icon={Search} label="Hledat" />
           <NavRow href="/chat/zminky" active={pathname === "/chat/zminky"} icon={AtSign} label="Zmínky" />
           <NavRow href="/chat/ulozene" active={pathname === "/chat/ulozene"} icon={Bookmark} label="Uložené" />
+          {scheduled.length > 0 && (
+            <NavRow href="/chat/naplanovane" active={pathname === "/chat/naplanovane"} icon={Clock} label={`Naplánované (${scheduled.length})`} />
+          )}
         </div>
 
         {sidebar === undefined ? (

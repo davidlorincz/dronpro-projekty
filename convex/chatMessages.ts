@@ -9,6 +9,7 @@ import type { MutationCtx } from "./_generated/server";
 import { requireUser, type Ctx } from "./auth";
 import { canReadChannel, getMembership, requireChannelRead, requireChannelWrite } from "./chatAccess";
 import { notify } from "./notifications";
+import { deleteRemindersBy } from "./chatSchedule";
 
 const MAX_LEN = 4000;
 const MAX_ATTACHMENTS = 10;
@@ -81,7 +82,7 @@ function parseMentions(ctx: Ctx, text: string, memberIds: Set<string>, authorId:
 }
 
 /** Text pro notifikaci: tokeny → jména, zkrácený. */
-async function plainSnippet(ctx: Ctx, text: string) {
+export async function plainSnippet(ctx: Ctx, text: string) {
   let out = text;
   for (const [token, raw] of [...text.matchAll(MENTION_RE)]) {
     const id = ctx.db.normalizeId("users", raw);
@@ -97,7 +98,7 @@ async function plainSnippet(ctx: Ctx, text: string) {
   return out.length > 200 ? `${out.slice(0, 200)}…` : out;
 }
 
-async function channelLabel(ctx: Ctx, channel: Doc<"chatChannels">) {
+export async function channelLabel(ctx: Ctx, channel: Doc<"chatChannels">) {
   if (channel.kind === "channel") return `#${channel.name}`;
   const members = await ctx.db.query("chatMembers").withIndex("by_channel", (q) => q.eq("channelId", channel._id)).collect();
   return members.length > 2 ? "skupinové zprávě" : "přímé zprávě";
@@ -139,6 +140,7 @@ async function deleteMentionRows(ctx: MutationCtx, messageId: Id<"chatMessages">
   for (const r of await ctx.db.query("chatSaved").withIndex("by_message", (q) => q.eq("messageId", messageId)).collect()) {
     await ctx.db.delete(r._id);
   }
+  await deleteRemindersBy(ctx, await ctx.db.query("chatReminders").withIndex("by_message", (q) => q.eq("messageId", messageId)).collect());
 }
 
 // ---- queries ---------------------------------------------------------------
@@ -262,17 +264,27 @@ export const generateUploadUrl = mutation({
   },
 });
 
-export const send = mutation({
-  args: {
-    channelId: v.id("chatChannels"),
-    text: v.string(),
-    parentId: v.optional(v.id("chatMessages")),
-    alsoInChannel: v.optional(v.boolean()),
-    attachments: v.optional(v.array(v.object({ storageId: v.id("_storage"), name: v.string() }))),
-  },
-  handler: async (ctx, args) => {
-    const { me, channel, membership } = await requireChannelWrite(ctx, args.channelId);
-    const text = cleanText(args.text, !!args.attachments?.length);
+export type DeliverArgs = {
+  text: string;
+  parentId?: Id<"chatMessages">;
+  alsoInChannel?: boolean;
+  attachments?: { storageId: Id<"_storage">; name: string }[];
+  poll?: Doc<"chatMessages">["poll"];
+};
+
+/**
+ * Vložení zprávy + čítače nepřečtených, zmínky, vlákna a notifikace. Sdílí ho
+ * `send`, ankety i naplánované odeslání (to běží bez auth kontextu, proto se
+ * autor a jeho členství předávají a práva ověřuje volající).
+ */
+export async function deliverMessage(
+  ctx: MutationCtx,
+  me: Doc<"users">,
+  channel: Doc<"chatChannels">,
+  membership: Doc<"chatMembers">,
+  args: DeliverArgs,
+) {
+    const text = cleanText(args.text, !!args.attachments?.length || !!args.poll);
 
     let root: Doc<"chatMessages"> | null = null;
     if (args.parentId) {
@@ -301,6 +313,7 @@ export const send = mutation({
       mentionsChannel: mentionsChannel || undefined,
       reactions: [],
       attachments,
+      poll: args.poll,
       replyCount: 0,
       replyUserIds: [],
       createdAt: now,
@@ -316,7 +329,9 @@ export const send = mutation({
 
     const who = me.name ?? me.email;
     const where = await channelLabel(ctx, channel);
-    const body = (await plainSnippet(ctx, text)) || `📎 ${attachments.map((a) => a.name).join(", ")}`;
+    const body = args.poll
+      ? `📊 Anketa: ${args.poll.question}`
+      : (await plainSnippet(ctx, text)) || `📎 ${attachments.map((a) => a.name).join(", ")}`;
     const link = root ? `/chat/${channel._id}?vlakno=${root._id}` : `/chat/${channel._id}?zprava=${messageId}`;
     const notified = new Set<string>();
 
@@ -385,6 +400,19 @@ export const send = mutation({
       }
     }
     return messageId;
+}
+
+export const send = mutation({
+  args: {
+    channelId: v.id("chatChannels"),
+    text: v.string(),
+    parentId: v.optional(v.id("chatMessages")),
+    alsoInChannel: v.optional(v.boolean()),
+    attachments: v.optional(v.array(v.object({ storageId: v.id("_storage"), name: v.string() }))),
+  },
+  handler: async (ctx, args) => {
+    const { me, channel, membership } = await requireChannelWrite(ctx, args.channelId);
+    return await deliverMessage(ctx, me, channel, membership, args);
   },
 });
 
@@ -393,6 +421,7 @@ export const edit = mutation({
   handler: async (ctx, args) => {
     const msg = await ctx.db.get(args.messageId);
     if (!msg || msg.deletedAt || msg.system) throw new ConvexError("Zpráva nenalezena.");
+    if (msg.poll) throw new ConvexError("Anketu upravit nejde — uzavři ji a založ novou.");
     const { me, channel } = await requireChannelWrite(ctx, msg.channelId);
     if (msg.authorId !== me._id) throw new ConvexError("Upravit můžeš jen vlastní zprávu.");
     const text = cleanText(args.text, msg.attachments.length > 0);
@@ -431,7 +460,7 @@ export const remove = mutation({
     // Root s odpověďmi zůstává jako „Zpráva byla smazána“, jinak by vlákno osiřelo.
     if (!msg.parentId && msg.replyCount > 0) {
       await ctx.db.patch(msg._id, {
-        text: "", attachments: [], reactions: [], mentions: [], pinnedAt: undefined, pinnedBy: undefined, deletedAt: Date.now(),
+        text: "", attachments: [], reactions: [], mentions: [], pinnedAt: undefined, pinnedBy: undefined, poll: undefined, deletedAt: Date.now(),
       });
       return;
     }

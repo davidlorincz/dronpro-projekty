@@ -19,6 +19,7 @@ const INLINE_RE = new RegExp(
     "(?<![\\p{L}\\p{N}*])\\*(?!\\s)([^*\\n]+?)(?<!\\s)\\*(?![\\p{L}\\p{N}*])", // 6 tučně
     "(?<![\\p{L}\\p{N}_])_(?!\\s)([^_\\n]+?)(?<!\\s)_(?![\\p{L}\\p{N}_])", // 7 kurzíva
     "(?<![\\p{L}\\p{N}~])~(?!\\s)([^~\\n]+?)(?<!\\s)~(?![\\p{L}\\p{N}~])", // 8 přeškrtnutí
+    "(?<![\\p{L}\\p{N}]):([a-z0-9_-]{2,32}):(?![\\p{L}\\p{N}])", // 9 vlastní emoji
   ].join("|"),
   "gu",
 );
@@ -27,7 +28,7 @@ const EMOJI_ONLY_RE = /^(?:\p{Extended_Pictographic}|\p{Emoji_Modifier}|\u200d|\
 
 /** `noLinks` — pro náhledy uvnitř karty, která už sama je odkaz (vnořené <a> je nevalidní HTML). */
 function useInline(noLinks = false) {
-  const { me, userName, channelMap } = useChat();
+  const { me, userName, channelMap, emojiMap } = useChat();
 
   const inline = (text: string, keyPrefix: string): ReactNode[] => {
     const out: ReactNode[] = [];
@@ -70,6 +71,10 @@ function useInline(noLinks = false) {
         out.push(<em key={key}>{inline(m[7], key)}</em>);
       } else if (m[8]) {
         out.push(<s key={key}>{inline(m[8], key)}</s>);
+      } else if (m[9]) {
+        const url = emojiMap.get(m[9]);
+        // eslint-disable-next-line @next/next/no-img-element
+        out.push(url ? <img key={key} src={url} alt={m[0]} title={m[0]} className="inline-block h-[1.3em] w-[1.3em] object-contain align-[-0.25em]" /> : m[0]);
       }
       last = start + m[0].length;
     }
@@ -87,10 +92,15 @@ export function InlineText({ text, noLinks }: { text: string; noLinks?: boolean 
 
 export function MessageText({ text, className }: { text: string; className?: string }) {
   const inline = useInline();
+  const { emojiMap } = useChat();
   if (!text) return null;
 
-  if (EMOJI_ONLY_RE.test(text) && [...text.replace(/\s/g, "")].length <= 12) {
-    return <div className={cn("text-3xl leading-snug", className)}>{text}</div>;
+  // Jen emoji (i vlastní) → větší, jako ve Slacku.
+  const customCount = (text.match(/:[a-z0-9_-]{2,32}:/g) ?? []).filter((t) => emojiMap.has(t.slice(1, -1))).length;
+  const rest = text.replace(/:([a-z0-9_-]{2,32}):/g, (m, name: string) => (emojiMap.has(name) ? "" : m)).replace(/\s/g, "");
+  const glyphs = customCount + [...rest].length;
+  if (glyphs > 0 && glyphs <= 12 && (!rest || EMOJI_ONLY_RE.test(rest))) {
+    return <div className={cn("text-3xl leading-snug [&_img]:h-8 [&_img]:w-8", className)}>{inline(text, "j")}</div>;
   }
 
   const blocks: ReactNode[] = [];

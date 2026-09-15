@@ -16,6 +16,8 @@ export const NOTIFICATION_TYPES = [
   { key: "chat_dm", label: "Přímá zpráva", desc: "Nová zpráva v přímé konverzaci (DM) s tebou.", adminOnly: false, defaults: { inApp: true, email: false } },
   { key: "chat_channel_message", label: "Zpráva v kanálu", desc: "Každá nová zpráva v kanálech, kde máš u zvonečku nastaveno „Všechny zprávy“.", adminOnly: false, defaults: { inApp: true, email: false } },
   { key: "chat_thread_reply", label: "Odpověď ve vlákně", desc: "Nová odpověď ve vlákně chatu, které sleduješ.", adminOnly: false, defaults: { inApp: true, email: false } },
+  { key: "chat_reminder", label: "Připomínka v chatu", desc: "Připomínka zprávy, kterou sis nastavil(a), nebo neodeslaná naplánovaná zpráva.", adminOnly: false, defaults: { inApp: true, email: false } },
+  { key: "chat_digest", label: "Souhrn nepřečtených v chatu", desc: "Ve všední den odpoledne e-mail se souhrnem nepřečtených zmínek, přímých zpráv a vláken — jen když něco čeká.", adminOnly: false, defaults: { inApp: false, email: true } },
   { key: "chat_added", label: "Přidán do kanálu", desc: "Někdo tě přidal do kanálu v chatu.", adminOnly: false, defaults: { inApp: true, email: false } },
   { key: "deadline_changed", label: "Člen změnil termín", desc: "Člen týmu změnil deadline nebo začátek projektu / subúkolu.", adminOnly: true, defaults: { inApp: true, email: true } },
   { key: "new_user", label: "Nový uživatel čeká na práva", desc: "Někdo se poprvé přihlásil a čeká na přidělení role.", adminOnly: true, defaults: { inApp: true, email: true } },

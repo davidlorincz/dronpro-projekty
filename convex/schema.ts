@@ -148,6 +148,15 @@ export const chatAttachmentValidator = v.object({
   size: v.number(),
 });
 
+/** Anketa je zpráva s polem `poll`; `text` drží otázku, aby šla najít fulltextem. */
+export const chatPollValidator = v.object({
+  question: v.string(),
+  multiple: v.boolean(), // lze zvolit víc možností
+  options: v.array(v.object({ id: v.string(), text: v.string(), voterIds: v.array(v.id("users")) })),
+  closedAt: v.optional(v.number()),
+  closedBy: v.optional(v.id("users")),
+});
+
 // ---- schéma ----------------------------------------------------------------
 
 export default defineSchema({
@@ -422,6 +431,7 @@ export default defineSchema({
     deletedAt: v.optional(v.number()),
     pinnedAt: v.optional(v.number()),
     pinnedBy: v.optional(v.id("users")),
+    poll: v.optional(chatPollValidator),
     createdAt: v.number(),
   })
     .index("by_channel_feed", ["channelId", "inChannel"])
@@ -453,6 +463,43 @@ export default defineSchema({
     .index("by_channel", ["channelId"])
     .index("by_user_channel", ["userId", "channelId"])
     .index("by_expires", ["expiresAt"]),
+
+  // „Připomeň mi tuhle zprávu“ — naplánovaná funkce, `jobId` kvůli zrušení.
+  chatReminders: defineTable({
+    userId: v.id("users"),
+    messageId: v.id("chatMessages"),
+    channelId: v.id("chatChannels"),
+    remindAt: v.number(),
+    jobId: v.optional(v.id("_scheduled_functions")), // doplní se hned po insertu
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId", "remindAt"])
+    .index("by_user_message", ["userId", "messageId"])
+    .index("by_message", ["messageId"])
+    .index("by_channel", ["channelId"]),
+
+  // Naplánované odeslání zprávy. Odesílá se až ve `sendAt` s aktuálními právy autora.
+  chatScheduled: defineTable({
+    userId: v.id("users"),
+    channelId: v.id("chatChannels"),
+    parentId: v.optional(v.id("chatMessages")),
+    alsoInChannel: v.optional(v.boolean()),
+    text: v.string(),
+    attachments: v.array(v.object({ storageId: v.id("_storage"), name: v.string() })),
+    sendAt: v.number(),
+    jobId: v.optional(v.id("_scheduled_functions")), // doplní se hned po insertu
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId", "sendAt"])
+    .index("by_channel", ["channelId"]),
+
+  // Vlastní emoji týmu (`:dronpro:`). Obrázek v file storage, název unikátní.
+  chatEmoji: defineTable({
+    name: v.string(), // a-z0-9_- , 2–32 znaků, bez dvojteček
+    storageId: v.id("_storage"),
+    createdBy: v.id("users"),
+    createdAt: v.number(),
+  }).index("by_name", ["name"]),
 
   // Online tečky. Samostatná tabulka, NE pole na `users`: heartbeat každou minutu
   // by jinak invalidoval každý dotaz, který čte uživatele (users.list, loadUserMap…).

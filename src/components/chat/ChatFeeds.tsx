@@ -6,7 +6,11 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { ArrowLeft, AtSign, Bookmark, BookmarkX, Hash, Loader2, MessagesSquare, Paperclip, Search, X } from "lucide-react";
+import { AlarmClock, AlarmClockOff, ArrowLeft, AtSign, Bookmark, BookmarkX, Clock, Hash, Loader2, MessagesSquare, Paperclip, Search, Send, Trash2, X } from "lucide-react";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { toast } from "@/lib/toast";
+import { WhenDialog } from "./WhenDialog";
+import { SCHEDULE_PRESETS, formatWhen } from "./when";
 import { errorToast } from "@/lib/convexError";
 import { UserAvatar } from "@/components/shared/UserAvatar";
 import { formatDateTime, timeAgo } from "@/lib/dates";
@@ -118,7 +122,7 @@ function MessageCard({ item, messageId, action }: { item: FeedItem; messageId: s
     <div className="group relative flex gap-2.5 rounded-2xl border border-a-border bg-a-surface p-4 transition-colors hover:bg-a-hover">
       {author ? <UserAvatar user={author} size="md" /> : <span className="h-8 w-8 rounded-full bg-a-elevated" />}
       <Link href={href} className="min-w-0 flex-1 text-sm text-a-text-2 after:absolute after:inset-0 after:content-['']">
-        <div className="flex items-baseline gap-2 pr-8">
+        <div className={cn("flex items-baseline gap-2", action ? "pr-36" : "")}>
           <span className="font-semibold text-a-text">{displayName(author)}</span>
           <span className="truncate text-xs text-a-text-4">{item.parentId ? "ve vlákně v " : "v "}{where}</span>
           <span className="ml-auto shrink-0 text-xs text-a-text-4" title={formatDateTime(item.createdAt)}>{timeAgo(item.createdAt)}</span>
@@ -148,10 +152,35 @@ export function MentionsView() {
 
 export function SavedView() {
   const saved = useQuery(api.chatExtras.saved);
+  const reminders = useQuery(api.chatSchedule.myReminders);
   const toggleSaved = useMutation(api.chatExtras.toggleSaved);
+  const cancelReminder = useMutation(api.chatSchedule.cancelReminder);
 
   return (
     <FeedShell icon={Bookmark} title="Uložené">
+      {reminders && reminders.length > 0 && (
+        <>
+          <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-a-text-4"><AlarmClock className="h-3.5 w-3.5" /> Připomínky</div>
+          {reminders.map((r) => (
+            <MessageCard
+              key={r._id} messageId={r.messageId} item={{ ...r, _id: r.messageId }}
+              action={
+                <span className="flex items-center gap-1">
+                  <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-medium text-violet-700">{formatWhen(r.remindAt)}</span>
+                  <button
+                    type="button" title="Zrušit připomínku"
+                    onClick={async () => { try { await cancelReminder({ reminderId: r._id }); } catch (e) { errorToast(e); } }}
+                    className="rounded-md p-1 text-a-text-4 hover:bg-a-elevated hover:text-a-text cursor-pointer"
+                  >
+                    <AlarmClockOff className="h-4 w-4" />
+                  </button>
+                </span>
+              }
+            />
+          ))}
+          <div className="pt-2 text-xs font-semibold uppercase tracking-wider text-a-text-4">Uložené zprávy</div>
+        </>
+      )}
       {saved === undefined ? (
         <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-a-text-4" /></div>
       ) : saved.length === 0 ? (
@@ -291,6 +320,70 @@ export function SearchView() {
           {results.map((m) => <MessageCard key={m._id} messageId={m._id} item={m} />)}
         </>
       )}
+    </FeedShell>
+  );
+}
+
+export function ScheduledView() {
+  const { scheduled, channelTitle, channelMap } = useChat();
+  const sendNow = useMutation(api.chatSchedule.sendScheduledNow);
+  const changeTime = useMutation(api.chatSchedule.changeTime);
+  const cancel = useMutation(api.chatSchedule.cancelScheduled);
+  const [editing, setEditing] = useState<{ id: Id<"chatScheduled">; sendAt: number } | null>(null);
+  const [toCancel, setToCancel] = useState<Id<"chatScheduled"> | null>(null);
+
+  return (
+    <FeedShell icon={Clock} title="Naplánované zprávy">
+      {scheduled.length === 0 ? (
+        <div className="py-16 text-center text-sm text-a-text-4">
+          Nic naplánovaného. Zprávu naplánuješ šipkou vedle tlačítka Odeslat.
+        </div>
+      ) : scheduled.map((m) => {
+        const where = m.channelKind === "channel"
+          ? `#${m.channelName}`
+          : channelTitle({ kind: "dm", dmUserIds: channelMap.get(m.channelId)?.dmUserIds ?? [] });
+        return (
+          <div key={m._id} className="rounded-2xl border border-a-border bg-a-surface p-4">
+            <div className="mb-1.5 flex flex-wrap items-center gap-2 text-xs text-a-text-3">
+              <span className="inline-flex items-center gap-1 rounded-full bg-a-accent-bg px-2 py-0.5 font-semibold text-a-accent-text">
+                <Clock className="h-3 w-3" /> {formatWhen(m.sendAt)}
+              </span>
+              <Link href={m.parentId ? `/chat/${m.channelId}?vlakno=${m.parentId}` : `/chat/${m.channelId}`} className="font-medium hover:underline">
+                {m.parentId ? "ve vlákně v " : ""}{where}
+              </Link>
+            </div>
+            <div className="text-sm text-a-text-2"><Snippet text={m.text} attachments={m.attachmentCount} /></div>
+            {m.attachmentCount > 0 && m.text && <div className="mt-1 text-xs text-a-text-4"><Paperclip className="-mt-0.5 inline h-3 w-3" /> {m.attachmentCount} příloh</div>}
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button type="button"
+                onClick={async () => { try { await sendNow({ scheduledId: m._id }); toast("Odesláno", "success"); } catch (e) { errorToast(e); } }}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-accent-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-accent-hover cursor-pointer">
+                <Send className="h-3.5 w-3.5" /> Odeslat teď
+              </button>
+              <button type="button" onClick={() => setEditing({ id: m._id, sendAt: m.sendAt })}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-a-border px-3 py-1.5 text-xs font-medium text-a-text-2 hover:bg-a-hover cursor-pointer">
+                <Clock className="h-3.5 w-3.5" /> Změnit čas
+              </button>
+              <button type="button" onClick={() => setToCancel(m._id)}
+                className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-a-hover cursor-pointer">
+                <Trash2 className="h-3.5 w-3.5" /> Zrušit
+              </button>
+            </div>
+          </div>
+        );
+      })}
+      {editing && (
+        <WhenDialog
+          title="Změnit čas odeslání" presets={SCHEDULE_PRESETS} confirmLabel="Uložit" initial={editing.sendAt}
+          onClose={() => setEditing(null)}
+          onPick={async (ts) => { try { await changeTime({ scheduledId: editing.id, sendAt: ts }); toast(`Odešle se ${formatWhen(ts)}`, "success"); } catch (e) { errorToast(e); } }}
+        />
+      )}
+      <ConfirmDialog
+        open={!!toCancel} title="Zrušit naplánovanou zprávu?" description="Zpráva se neodešle a její přílohy se smažou." confirmLabel="Zrušit zprávu"
+        onClose={() => setToCancel(null)}
+        onConfirm={async () => { if (toCancel) { try { await cancel({ scheduledId: toCancel }); } catch (e) { errorToast(e); } } }}
+      />
     </FeedShell>
   );
 }

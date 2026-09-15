@@ -4,7 +4,9 @@ import { useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } f
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { AtSign, FileText, Hash, Loader2, Megaphone, Paperclip, Send, Smile, X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import * as Popover from "@radix-ui/react-popover";
+import { AtSign, BarChart3, ChevronDown, Clock, FileText, Hash, Loader2, Megaphone, Paperclip, Send, Smile, X } from "lucide-react";
 import { UserAvatar } from "@/components/shared/UserAvatar";
 import { errorToast } from "@/lib/convexError";
 import { downscaleImage, formatBytes, postFile } from "@/lib/upload";
@@ -12,6 +14,11 @@ import { cn } from "@/lib/utils";
 import { displayName, useChat } from "./ChatContext";
 import { EmojiPicker } from "./EmojiPicker";
 import { searchShortcodes } from "./emoji";
+import { EmojiGlyph } from "./EmojiGlyph";
+import { PollDialog } from "./Poll";
+import { WhenDialog } from "./WhenDialog";
+import { SCHEDULE_PRESETS, formatWhen } from "./when";
+import { toast } from "@/lib/toast";
 import { encodeMessage, fold, type PickedMentions } from "./tokens";
 
 const MAX_BYTES = 20 * 1024 * 1024;
@@ -47,7 +54,12 @@ export function Composer({
   onEditLast?: () => void;
   autoFocus?: boolean;
 }) {
-  const { me, userMap, sidebar } = useChat();
+  const { me, userMap, sidebar, customEmoji } = useChat();
+  const router = useRouter();
+  const scheduleSend = useMutation(api.chatSchedule.schedule);
+  const [pollOpen, setPollOpen] = useState(false);
+  const [scheduleMenu, setScheduleMenu] = useState(false);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
   const send = useMutation(api.chatMessages.send);
   const generateUploadUrl = useMutation(api.chatMessages.generateUploadUrl);
   const setTyping = useMutation(api.presence.setTyping);
@@ -152,8 +164,12 @@ export function Composer({
         .slice(0, 8)
         .map((c) => ({ type: "channel", id: c._id, name: c.name ?? "" }));
     }
-    return searchShortcodes(trigger.query).map(([emoji, names]) => ({ type: "emoji", emoji, name: names[0] }));
-  }, [trigger, dismissedAt, memberIds, me._id, userMap, canMentionChannel, channels]);
+    const custom: Suggestion[] = customEmoji
+      .filter((e) => e.url && e.name.includes(trigger.query.toLowerCase()))
+      .slice(0, 4)
+      .map((e) => ({ type: "emoji", emoji: `:${e.name}:`, name: e.name }));
+    return [...custom, ...searchShortcodes(trigger.query).map(([emoji, names]): Suggestion => ({ type: "emoji", emoji, name: names[0] }))].slice(0, 8);
+  }, [trigger, dismissedAt, memberIds, me._id, userMap, canMentionChannel, channels, customEmoji]);
 
   const applySuggestion = (s: Suggestion) => {
     if (!trigger) return;
@@ -196,6 +212,27 @@ export function Composer({
   const uploading = pending.some((p) => !p.storageId);
   const canSend = !sending && !uploading && (text.trim().length > 0 || pending.length > 0);
 
+  const resetAfterSend = () => {
+    setText("");
+    writeDraft(draftKey, "");
+    setPicked(new Map());
+    setPending([]);
+    setAlsoInChannel(false);
+  };
+
+  const schedule = async (sendAt: number) => {
+    const body = encodeMessage(text, picked, channelIdByName);
+    const attachments = pending.filter((p) => p.storageId).map((p) => ({ storageId: p.storageId!, name: p.name }));
+    try {
+      await scheduleSend({ channelId, text: body, parentId, alsoInChannel: parentId ? alsoInChannel : undefined, attachments, sendAt });
+      resetAfterSend();
+      if (typingSentAt.current) { typingSentAt.current = 0; void setTyping({ channelId, parentId, typing: false }).catch(() => {}); }
+      toast(`Zpráva se odešle ${formatWhen(sendAt)}`, "success", undefined, { label: "Naplánované", onClick: () => router.push("/chat/naplanovane") });
+    } catch (e) {
+      errorToast(e, "Zprávu se nepodařilo naplánovat");
+    }
+  };
+
   const submit = async () => {
     if (!canSend) return;
     const body = encodeMessage(text, picked, channelIdByName);
@@ -203,12 +240,8 @@ export function Composer({
     setSending(true);
     try {
       await send({ channelId, text: body, parentId, alsoInChannel: parentId ? alsoInChannel : undefined, attachments });
-      setText("");
-      writeDraft(draftKey, "");
+      resetAfterSend();
       typingSentAt.current = 0; // řádek „píše…“ smazal už `send` na serveru
-      setPicked(new Map());
-      setPending([]);
-      setAlsoInChannel(false);
     } catch (e) {
       errorToast(e, "Zprávu se nepodařilo odeslat");
     } finally {
@@ -247,7 +280,7 @@ export function Composer({
               {s.type === "user" && (<><UserAvatar user={s.user} size="xs" /><span className="font-medium">{s.label}</span><span className="truncate text-xs text-a-text-4">{s.sub}</span></>)}
               {s.type === "kanal" && (<><Megaphone className="h-4 w-4" /><span className="font-medium">@kanal</span><span className="text-xs text-a-text-4">upozorní všechny členy kanálu</span></>)}
               {s.type === "channel" && (<><Hash className="h-4 w-4" /><span className="font-medium">{s.name}</span></>)}
-              {s.type === "emoji" && (<><span className="text-lg leading-none">{s.emoji}</span><span className="text-a-text-3">:{s.name}:</span></>)}
+              {s.type === "emoji" && (<><EmojiGlyph emoji={s.emoji} className="text-lg leading-none" /><span className="text-a-text-3">:{s.name}:</span></>)}
             </button>
           ))}
         </div>
@@ -293,6 +326,9 @@ export function Composer({
               <Smile className="h-4 w-4" />
             </button>
           </EmojiPicker>
+          <button type="button" onClick={() => setPollOpen(true)} className="rounded-lg p-1.5 text-a-text-3 hover:bg-a-hover hover:text-a-text cursor-pointer" title="Anketa">
+            <BarChart3 className="h-4 w-4" />
+          </button>
           <button type="button" onClick={() => insertAtCaret(text && !/\s$/.test(text.slice(0, caret)) ? " @" : "@")} className="rounded-lg p-1.5 text-a-text-3 hover:bg-a-hover hover:text-a-text cursor-pointer" title="Zmínit člověka">
             <AtSign className="h-4 w-4" />
           </button>
@@ -305,14 +341,52 @@ export function Composer({
           )}
           <span className="flex-1" />
           <span className={cn("hidden text-[10px] text-a-text-4", !parentId && "xl:inline")}>*tučně* _kurzíva_ `kód` · Shift+Enter nový řádek</span>
-          <button
-            type="button" onClick={() => void submit()} disabled={!canSend} title="Odeslat (Enter)"
-            className="ml-2 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-primary text-white hover:bg-accent-hover disabled:opacity-40 cursor-pointer disabled:cursor-default"
-          >
-            {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-          </button>
+          <div className="ml-2 flex shrink-0">
+            <button
+              type="button" onClick={() => void submit()} disabled={!canSend} title="Odeslat (Enter)"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-l-lg bg-accent-primary text-white hover:bg-accent-hover disabled:opacity-40 cursor-pointer disabled:cursor-default"
+            >
+              {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            </button>
+            <Popover.Root open={scheduleMenu} onOpenChange={setScheduleMenu}>
+              <Popover.Trigger asChild>
+                <button
+                  type="button" disabled={!canSend} title="Naplánovat odeslání"
+                  className="inline-flex h-8 w-6 items-center justify-center rounded-r-lg border-l border-white/30 bg-accent-primary text-white hover:bg-accent-hover disabled:opacity-40 cursor-pointer disabled:cursor-default"
+                >
+                  <ChevronDown className="h-3.5 w-3.5" />
+                </button>
+              </Popover.Trigger>
+              <Popover.Portal>
+                <Popover.Content side="top" align="end" sideOffset={6} className="z-50 w-56 rounded-xl border border-a-border bg-a-surface py-1 shadow-xl">
+                  {SCHEDULE_PRESETS.map((p) => (
+                    <button key={p.label} type="button" onClick={() => { setScheduleMenu(false); void schedule(p.at()); }}
+                      className="flex w-full items-center justify-between px-3 py-1.5 text-left text-sm text-a-text-2 hover:bg-a-hover cursor-pointer">
+                      <span>{p.label}</span>
+                    </button>
+                  ))}
+                  <div className="my-1 border-t border-a-border" />
+                  <button type="button" onClick={() => { setScheduleMenu(false); setScheduleOpen(true); }}
+                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-a-text-2 hover:bg-a-hover cursor-pointer">
+                    <Clock className="h-4 w-4" /> Vlastní čas…
+                  </button>
+                </Popover.Content>
+              </Popover.Portal>
+            </Popover.Root>
+          </div>
         </div>
       </div>
+      {pollOpen && <PollDialog channelId={channelId} parentId={parentId} onClose={() => setPollOpen(false)} />}
+      {scheduleOpen && (
+        <WhenDialog
+          title="Naplánovat odeslání"
+          description="Zpráva odejde automaticky. Do té doby ji můžeš zrušit v Naplánovaných."
+          presets={SCHEDULE_PRESETS}
+          confirmLabel="Naplánovat"
+          onClose={() => setScheduleOpen(false)}
+          onPick={schedule}
+        />
+      )}
     </div>
   );
 }

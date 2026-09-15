@@ -19,6 +19,12 @@ type ChatCtx = {
   channelMap: Map<string, SidebarChannel>;
   userName: (id: Id<"users"> | string) => string;
   savedIds: Set<string>;
+  /** Vlastní emoji `name → url`. */
+  emojiMap: Map<string, string>;
+  customEmoji: { _id: Id<"chatEmoji">; name: string; url: string | null; createdBy: Id<"users"> }[];
+  /** Moje připomínky podle zprávy. */
+  reminderByMessage: Map<string, { _id: Id<"chatReminders">; remindAt: number }>;
+  scheduled: FunctionReturnType<typeof api.chatSchedule.myScheduled>;
   isOnline: (id: string) => boolean;
   /** „#marketing“ / „Petr, Jana“ / „Poznámky pro sebe“. */
   channelTitle: (c: { kind: "channel" | "dm"; name?: string; dmUserIds: string[] }) => string;
@@ -45,6 +51,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const sidebar = useQuery(api.chat.mySidebar);
   const saved = useQuery(api.chatExtras.savedIds);
   const presence = useQuery(api.presence.online);
+  const emoji = useQuery(api.chatEmoji.list);
+  const reminders = useQuery(api.chatSchedule.myReminders);
+  const scheduled = useQuery(api.chatSchedule.myScheduled);
   // Query se s plynoucím časem sama nepřepočítá — „online“ vyhodnocujeme proti vlastním hodinám.
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -65,6 +74,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       channelMap,
       userName,
       savedIds: new Set((saved ?? []).map(String)),
+      emojiMap: new Map((emoji ?? []).filter((e) => e.url).map((e) => [e.name, e.url!])),
+      customEmoji: emoji ?? [],
+      reminderByMessage: new Map((reminders ?? []).map((r) => [r.messageId as string, { _id: r._id, remindAt: r.remindAt }])),
+      scheduled: scheduled ?? [],
       isOnline: (id) => online.has(id),
       channelTitle: (c) => {
         if (c.kind === "channel") return c.name ?? "kanál";
@@ -72,7 +85,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         return c.dmUserIds.map(userName).join(", ");
       },
     };
-  }, [me, users, sidebar, saved, presence, now]);
+  }, [me, users, sidebar, saved, presence, emoji, reminders, scheduled, now]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

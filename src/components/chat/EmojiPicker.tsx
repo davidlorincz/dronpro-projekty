@@ -3,7 +3,11 @@
 import { useState, type ReactNode } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import { EmojiPicker as Picker } from "frimousse";
+import { Settings2 } from "lucide-react";
 import { pushRecentEmoji, readRecentEmoji } from "./emoji";
+import { useChat } from "./ChatContext";
+import { EmojiGlyph } from "./EmojiGlyph";
+import { CustomEmojiDialog } from "./CustomEmojiDialog";
 
 /** Výběr emoji v popoveru. Data (emojibase) si frimousse stahuje z CDN až při otevření. */
 export function EmojiPicker({
@@ -17,6 +21,8 @@ export function EmojiPicker({
 }) {
   const [open, setOpen] = useState(false);
   const [recent, setRecent] = useState<string[]>([]);
+  const [manage, setManage] = useState(false);
+  const { customEmoji } = useChat();
 
   const change = (next: boolean) => {
     if (next) setRecent(readRecentEmoji());
@@ -30,6 +36,7 @@ export function EmojiPicker({
   };
 
   return (
+    <>
     <Popover.Root open={open} onOpenChange={change}>
       <Popover.Trigger asChild>{children}</Popover.Trigger>
       <Popover.Portal>
@@ -38,13 +45,31 @@ export function EmojiPicker({
           className="z-[60] w-[320px] max-w-[calc(100vw-24px)] overflow-hidden rounded-2xl border border-a-border bg-a-surface shadow-xl"
           onClick={(e) => e.stopPropagation()}
         >
+          <div className="border-b border-a-border px-2 py-1.5">
+            <div className="flex items-center px-1 pb-1">
+              <span className="flex-1 text-[10px] font-semibold uppercase tracking-wider text-a-text-4">Emoji týmu</span>
+              <button type="button" onClick={() => { change(false); setManage(true); }} className="flex items-center gap-1 rounded px-1 text-[10px] font-medium text-a-accent-text hover:underline cursor-pointer">
+                <Settings2 className="h-3 w-3" /> {customEmoji.length ? "Spravovat" : "Přidat vlastní"}
+              </button>
+            </div>
+            {customEmoji.length > 0 && (
+              <div className="flex max-h-24 flex-wrap overflow-y-auto">
+                {customEmoji.filter((e) => e.url).map((e) => (
+                  <button key={e._id} type="button" onClick={() => pick(`:${e.name}:`)} title={`:${e.name}:`} className="flex size-8 items-center justify-center rounded-md hover:bg-a-hover cursor-pointer">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={e.url!} alt={e.name} className="h-5 w-5 object-contain" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           {recent.length > 0 && (
             <div className="border-b border-a-border px-2 py-1.5">
               <div className="px-1 pb-1 text-[10px] font-semibold uppercase tracking-wider text-a-text-4">Naposledy použité</div>
               <div className="flex flex-wrap">
                 {recent.slice(0, 16).map((e) => (
                   <button key={e} type="button" onClick={() => pick(e)} className="flex size-8 items-center justify-center rounded-md text-lg hover:bg-a-hover cursor-pointer">
-                    {e}
+                    <EmojiGlyph emoji={e} />
                   </button>
                 ))}
               </div>
@@ -83,5 +108,7 @@ export function EmojiPicker({
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>
+    {manage && <CustomEmojiDialog onClose={() => setManage(false)} />}
+    </>
   );
 }
