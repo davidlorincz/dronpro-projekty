@@ -18,6 +18,7 @@ import type * as chatAccess from "../chatAccess.js";
 import type * as chatDigest from "../chatDigest.js";
 import type * as chatEmoji from "../chatEmoji.js";
 import type * as chatExtras from "../chatExtras.js";
+import type * as chatLinks from "../chatLinks.js";
 import type * as chatMessages from "../chatMessages.js";
 import type * as chatPolls from "../chatPolls.js";
 import type * as chatSchedule from "../chatSchedule.js";
@@ -64,6 +65,7 @@ declare const fullApi: ApiFromModules<{
   chatDigest: typeof chatDigest;
   chatEmoji: typeof chatEmoji;
   chatExtras: typeof chatExtras;
+  chatLinks: typeof chatLinks;
   chatMessages: typeof chatMessages;
   chatPolls: typeof chatPolls;
   chatSchedule: typeof chatSchedule;

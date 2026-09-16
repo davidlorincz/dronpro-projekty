@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { roleValidator } from "./schema";
+import { foldText } from "./lib";
 
 /** Údržba z CLI: `npx convex run maintenance:removeUserByEmail '{"email":"..."}'` */
 export const removeUserByEmail = internalMutation({
@@ -102,5 +103,37 @@ export const testEmail = internalMutation({
       body: "Tohle je testovací notifikace z aplikace DRONPRO Projekty.", link: "/notifikace",
     });
     return "scheduled";
+  },
+});
+
+/**
+ * Dopočet odvozených polí chatu po nasazení F4:
+ * `npx convex run maintenance:backfillChat '{}'`
+ * Běží po dávkách a sama se naplánuje, dokud nedojde na konec.
+ */
+export const backfillChat = internalMutation({
+  args: { cursor: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const page = await ctx.db.query("chatMessages").paginate({ numItems: 300, cursor: args.cursor ?? null });
+    let fixed = 0;
+    for (const m of page.page) {
+      const patch: Record<string, unknown> = {};
+      if (m.searchText === undefined) patch.searchText = foldText(m.text);
+      if (m.hasAttachments === undefined) patch.hasAttachments = m.attachments.length > 0;
+      if (Object.keys(patch).length) {
+        await ctx.db.patch(m._id, patch);
+        fixed++;
+      }
+    }
+    if (!page.isDone) {
+      await ctx.scheduler.runAfter(0, internal.maintenance.backfillChat, { cursor: page.continueCursor });
+      return `pokračuji, opraveno v této dávce: ${fixed}`;
+    }
+    // Na závěr dopočítej počty členů kanálů.
+    for (const c of await ctx.db.query("chatChannels").collect()) {
+      const members = await ctx.db.query("chatMembers").withIndex("by_channel", (q) => q.eq("channelId", c._id)).collect();
+      if (c.memberCount !== members.length) await ctx.db.patch(c._id, { memberCount: members.length });
+    }
+    return `hotovo, poslední dávka: ${fixed}`;
   },
 });

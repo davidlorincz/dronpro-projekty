@@ -7,6 +7,7 @@ import { requireProjectAccess, requireSubtaskAccess } from "./access";
 import { linkValidator, phaseValidator, priorityValidator, statusValidator, todoValidator } from "./schema";
 import { logActivity, fieldLabel } from "./activity";
 import { notify, notifyAdmins } from "./notifications";
+import { postEntityUpdate } from "./chatLinks";
 import { deleteCommentsFor, insertComment } from "./comments";
 import { computeStats, enrichSubtask, loadUserMap, todayISO } from "./lib";
 
@@ -168,6 +169,16 @@ async function diffAndLog(ctx: MutationCtx, me: Doc<"users">, before: Doc<"subta
           link: `/projekty/${before.projectId}?subtask=${before._id}`,
         });
       }
+    }
+    // Do kanálu projektu (když nějaký je) hlásíme jen to podstatné.
+    if (field === "status" && project && (newValue === "finished" || newValue === "blocked")) {
+      await postEntityUpdate(ctx, {
+        projectId: project._id,
+        actorId: me._id,
+        text: newValue === "finished"
+          ? `<@${me._id}> dokončil(a) subúkol ${before.title}`
+          : `<@${me._id}> zablokoval(a) subúkol ${before.title}`,
+      });
     }
     if (field === "status" && newValue === "finished" && project) {
       // Hlášení „hotovo“ zadavateli: vlastníkům projektu + tomu, kdo úkol založil.

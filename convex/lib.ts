@@ -227,3 +227,19 @@ export async function loadSubtasksByProject(
   );
   return map;
 }
+
+/** Text bez diakritiky a malými písmeny — fulltext chatu a porovnávání jmen. */
+export function foldText(s: string) {
+  return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+}
+
+/** Je uživatel v tichých hodinách / Nerušit? Počítá se v pražském čase. */
+export function isQuietNow(p: { dndUntil?: number; quietFrom?: string; quietTo?: string } | null | undefined, now = Date.now()) {
+  if (!p) return false;
+  if (p.dndUntil && p.dndUntil > now) return true;
+  if (!p.quietFrom || !p.quietTo) return false;
+  const prague = new Date(now + 2 * 60 * 60 * 1000); // stačí přibližný posun pro noční okno
+  const hm = `${String(prague.getUTCHours()).padStart(2, "0")}:${String(prague.getUTCMinutes()).padStart(2, "0")}`;
+  // Okno přes půlnoc (22:00–07:00) i běžné (12:00–13:00).
+  return p.quietFrom <= p.quietTo ? hm >= p.quietFrom && hm < p.quietTo : hm >= p.quietFrom || hm < p.quietTo;
+}

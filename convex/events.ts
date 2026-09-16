@@ -8,6 +8,16 @@ import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { requireUser, requireAdmin } from "./auth";
 import { requireEditor } from "./access";
+import { postEntityUpdate } from "./chatLinks";
+
+/** Popisky stavů akcí pro zprávy do kanálu (kopie z src/lib/constants.ts). */
+const EVENT_STATUS_LABEL: Record<string, string> = {
+  not_started: "Nezačato",
+  in_progress: "Probíhá příprava",
+  ready_to_go: "Ready to go",
+  done: "Hotovo",
+  cancelled: "Zrušeno",
+};
 import {
   contactValidator,
   costItemValidator,
@@ -384,10 +394,17 @@ export const update = mutation({
 export const setStatus = mutation({
   args: { id: v.id("events"), status: eventStatusValidator },
   handler: async (ctx, args) => {
-    await requireEditor(ctx);
+    const me = await requireEditor(ctx);
     const before = await ctx.db.get(args.id);
     if (!before) throw new ConvexError("Akce nenalezena.");
     await ctx.db.patch(args.id, { status: args.status, updatedAt: Date.now() });
+    if (args.status !== before.status) {
+      await postEntityUpdate(ctx, {
+        eventId: args.id,
+        actorId: me._id,
+        text: `<@${me._id}> změnil(a) stav na ${EVENT_STATUS_LABEL[args.status]}`,
+      });
+    }
     if (
       args.status !== before.status &&
       (args.status === "cancelled" || before.status === "cancelled")

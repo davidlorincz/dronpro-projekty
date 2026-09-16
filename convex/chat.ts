@@ -1,7 +1,7 @@
 // Chat — kanály, DM, členství a osobní stav (přečteno, oblíbené, ztlumení).
 // Zprávy a vlákna jsou v `chatMessages.ts`, pravidla přístupu v `chatAccess.ts`.
 import { v, ConvexError } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { getCurrentUser, requireUser } from "./auth";
@@ -12,6 +12,7 @@ import {
 import { chatNotifyValidator } from "./schema";
 import { notify } from "./notifications";
 import { deleteChatBlobs } from "./chatMessages";
+import { internal } from "./_generated/api";
 import { deleteRemindersBy, deleteScheduledBy } from "./chatSchedule";
 
 export const DEFAULT_CHANNEL_NAME = "obecne";
@@ -45,12 +46,24 @@ async function assertNameFree(ctx: MutationCtx, name: string, except?: Id<"chatC
   if (clash && clash._id !== except) throw new ConvexError(`Kanál #${name} už existuje.`);
 }
 
-/** Systémová zpráva v timeline. Nezvyšuje `lastMessageAt` — nemá dělat kanál nepřečteným. */
-export async function insertSystemMessage(ctx: MutationCtx, channelId: Id<"chatChannels">, authorId: Id<"users">, text: string) {
+/**
+ * Systémová zpráva v timeline. Ve výchozím stavu nezvyšuje `lastMessageAt` —
+ * „připojil se do kanálu“ nemá dělat kanál nepřečteným. `bump` použij u zpráv,
+ * které si přečíst zaslouží (změny navázaného projektu); notifikace nechodí ani tak.
+ */
+export async function insertSystemMessage(
+  ctx: MutationCtx,
+  channelId: Id<"chatChannels">,
+  authorId: Id<"users">,
+  text: string,
+  opts?: { bump?: boolean },
+) {
+  const now = Date.now();
   await ctx.db.insert("chatMessages", {
     channelId, authorId, text, inChannel: true, system: true,
-    mentions: [], reactions: [], attachments: [], replyCount: 0, replyUserIds: [], createdAt: Date.now(),
+    mentions: [], reactions: [], attachments: [], replyCount: 0, replyUserIds: [], createdAt: now,
   });
+  if (opts?.bump) await ctx.db.patch(channelId, { lastMessageAt: now });
 }
 
 async function insertMember(ctx: MutationCtx, channelId: Id<"chatChannels">, userId: Id<"users">, role: "owner" | "member") {
@@ -58,7 +71,15 @@ async function insertMember(ctx: MutationCtx, channelId: Id<"chatChannels">, use
   if (existing) return false;
   const now = Date.now();
   await ctx.db.insert("chatMembers", { channelId, userId, role, joinedAt: now, lastReadAt: now, mentionCount: 0 });
+  await bumpMemberCount(ctx, channelId, 1);
   return true;
+}
+
+/** Denormalizovaný počet členů — `browse` jinak čte členy každého kanálu zvlášť. */
+export async function bumpMemberCount(ctx: MutationCtx, channelId: Id<"chatChannels">, delta: number) {
+  const channel = await ctx.db.get(channelId);
+  if (!channel) return;
+  await ctx.db.patch(channelId, { memberCount: Math.max(0, (channel.memberCount ?? 0) + delta) });
 }
 
 /** Aktivní uživatelé z klientského seznamu — neexistující a neaktivní tiše vynechá. */
@@ -131,7 +152,7 @@ export const mySidebar = query({
     const items = [];
     for (const m of memberships) {
       const c = await ctx.db.get(m.channelId);
-      if (!c || c.archivedAt) continue;
+      if (!c || c.archivedAt || c.deletingAt) continue;
       let dmUserIds: Id<"users">[] = [];
       if (c.kind === "dm") {
         const all = await ctx.db.query("chatMembers").withIndex("by_channel", (q) => q.eq("channelId", c._id)).collect();
@@ -180,9 +201,11 @@ export const browse = query({
     const channels = await ctx.db.query("chatChannels").withIndex("by_kind", (q) => q.eq("kind", "channel")).collect();
     const out = [];
     for (const c of channels) {
+      if (c.deletingAt) continue;
       const membership = await getMembership(ctx, c._id, me._id);
       if (!canSeeChannel(me, c, membership)) continue;
-      const members = await ctx.db.query("chatMembers").withIndex("by_channel", (q) => q.eq("channelId", c._id)).collect();
+      const memberCount = c.memberCount
+        ?? (await ctx.db.query("chatMembers").withIndex("by_channel", (q) => q.eq("channelId", c._id)).collect()).length;
       out.push({
         _id: c._id,
         name: c.name ?? "",
@@ -191,7 +214,7 @@ export const browse = query({
         visibility: c.visibility,
         isDefault: !!c.isDefault,
         archivedAt: c.archivedAt,
-        memberCount: members.length,
+        memberCount,
         isMember: !!membership,
         canJoin: !membership && canJoinChannel(me, c),
         lastMessageAt: c.lastMessageAt,
@@ -208,7 +231,7 @@ export const get = query({
     const me = await requireUser(ctx);
     const id = ctx.db.normalizeId("chatChannels", args.channelId);
     const c = id ? await ctx.db.get(id) : null;
-    if (!c) return null;
+    if (!c || c.deletingAt) return null;
     const membership = await getMembership(ctx, c._id, me._id);
     if (!canSeeChannel(me, c, membership)) return null;
     const members = await ctx.db.query("chatMembers").withIndex("by_channel", (q) => q.eq("channelId", c._id)).collect();
@@ -334,6 +357,7 @@ export const leave = mutation({
     const membership = await getMembership(ctx, channel._id, me._id);
     if (!membership) return;
     await ctx.db.delete(membership._id);
+    await bumpMemberCount(ctx, channel._id, -1);
     await insertSystemMessage(ctx, channel._id, me._id, `<@${me._id}> opustil(a) kanál`);
   },
 });
@@ -357,6 +381,7 @@ export const removeMember = mutation({
     const target = await getMembership(ctx, channel._id, args.userId);
     if (!target) return;
     await ctx.db.delete(target._id);
+    await bumpMemberCount(ctx, channel._id, -1);
     await insertSystemMessage(ctx, channel._id, me._id, `<@${me._id}> odebral(a) z kanálu <@${args.userId}>`);
   },
 });
@@ -419,6 +444,10 @@ export const setArchived = mutation({
 });
 
 /** Trvalé smazání — jen admin a jen archivovaný kanál (stejně jako u projektů). */
+/**
+ * Trvalé smazání kanálu. Kanál se jen označí a maže se po dávkách přes
+ * scheduler — `collect()` nad desítkami tisíc zpráv by přetekl limity Convexu.
+ */
 export const hardDelete = mutation({
   args: { channelId: v.id("chatChannels") },
   handler: async (ctx, args) => {
@@ -427,11 +456,34 @@ export const hardDelete = mutation({
     const channel = await ctx.db.get(args.channelId);
     if (!channel) return;
     if (channel.kind !== "channel" || !channel.archivedAt) throw new ConvexError("Smazat jde jen archivovaný kanál.");
-    const messages = await ctx.db.query("chatMessages").withIndex("by_channel", (q) => q.eq("channelId", channel._id)).collect();
+    if (channel.deletingAt) return;
+    await ctx.db.patch(channel._id, { deletingAt: Date.now() });
+    await ctx.scheduler.runAfter(0, internal.chat.purgeChannel, { channelId: channel._id });
+  },
+});
+
+const PURGE_BATCH = 200;
+
+export const purgeChannel = internalMutation({
+  args: { channelId: v.id("chatChannels") },
+  handler: async (ctx, args) => {
+    const channel = await ctx.db.get(args.channelId);
+    if (!channel || !channel.deletingAt) return;
+
+    const messages = await ctx.db
+      .query("chatMessages")
+      .withIndex("by_channel", (q) => q.eq("channelId", channel._id))
+      .take(PURGE_BATCH);
     for (const m of messages) {
       await deleteChatBlobs(ctx, m.attachments);
       await ctx.db.delete(m._id);
     }
+    if (messages.length === PURGE_BATCH) {
+      // Ještě zbývají zprávy — pokračuj další dávkou.
+      await ctx.scheduler.runAfter(0, internal.chat.purgeChannel, { channelId: channel._id });
+      return;
+    }
+
     await deleteRemindersBy(ctx, await ctx.db.query("chatReminders").withIndex("by_channel", (q) => q.eq("channelId", channel._id)).collect());
     await deleteScheduledBy(ctx, await ctx.db.query("chatScheduled").withIndex("by_channel", (q) => q.eq("channelId", channel._id)).collect());
     for (const table of ["chatMembers", "chatThreadFollows", "chatMentions", "chatSaved", "chatTyping"] as const) {
@@ -473,6 +525,25 @@ export const markRead = mutation({
     if (!membership || !channel) return;
     if (membership.lastReadAt >= channel.lastMessageAt && membership.mentionCount === 0) return;
     await ctx.db.patch(membership._id, { lastReadAt: Math.max(Date.now(), channel.lastMessageAt), mentionCount: 0 });
+  },
+});
+
+/** Označí všechny kanály jako přečtené — patchuje jen ty, kde je opravdu co měnit. */
+export const markAllRead = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const me = await requireUser(ctx);
+    const memberships = await ctx.db.query("chatMembers").withIndex("by_user", (q) => q.eq("userId", me._id)).collect();
+    const now = Date.now();
+    let changed = 0;
+    for (const m of memberships) {
+      const channel = await ctx.db.get(m.channelId);
+      if (!channel) continue;
+      if (m.lastReadAt >= channel.lastMessageAt && m.mentionCount === 0) continue;
+      await ctx.db.patch(m._id, { lastReadAt: Math.max(now, channel.lastMessageAt), mentionCount: 0 });
+      changed++;
+    }
+    return changed;
   },
 });
 

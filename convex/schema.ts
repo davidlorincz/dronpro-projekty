@@ -394,6 +394,13 @@ export default defineSchema({
     dmKey: v.optional(v.string()),
     /** `#obecne` — automatické členství, nejde opustit ani archivovat. */
     isDefault: v.optional(v.boolean()),
+    /** Kanál navázaný na projekt / akci — sem chodí systémové zprávy o změnách. */
+    projectId: v.optional(v.id("projects")),
+    eventId: v.optional(v.id("events")),
+    /** Denormalizovaný počet členů — `browse` jinak čte členy každého kanálu. */
+    memberCount: v.optional(v.number()),
+    /** Probíhá dávkové mazání (`chat.purgeChannel`) — kanál se nikde nezobrazuje. */
+    deletingAt: v.optional(v.number()),
     lastMessageAt: v.number(),
     archivedAt: v.optional(v.number()),
     createdBy: v.id("users"),
@@ -402,7 +409,9 @@ export default defineSchema({
     .index("by_kind", ["kind"])
     .index("by_name", ["name"])
     .index("by_dmKey", ["dmKey"])
-    .index("by_default", ["isDefault"]),
+    .index("by_default", ["isDefault"])
+    .index("by_project", ["projectId"])
+    .index("by_event", ["eventId"]),
 
   // Členství + osobní stav kanálu. Čítače jsou denormalizované, aby sidebar
   // nemusel počítat zprávy za běhu.
@@ -446,14 +455,29 @@ export default defineSchema({
     pinnedBy: v.optional(v.id("users")),
     poll: v.optional(chatPollValidator),
     gif: v.optional(chatGifValidator),
+    /** Snímek přeposlané zprávy — ne kopie příloh, ať se nemnoží bloby. */
+    forwardedFrom: v.optional(v.object({
+      messageId: v.id("chatMessages"),
+      channelId: v.id("chatChannels"),
+      authorId: v.id("users"),
+      createdAt: v.number(),
+      text: v.string(),
+      attachmentCount: v.number(),
+      gif: v.optional(chatGifValidator),
+    })),
+    /** `text` bez diakritiky a malými písmeny — fulltext běží nad tímhle. */
+    searchText: v.optional(v.string()),
+    hasAttachments: v.optional(v.boolean()),
     createdAt: v.number(),
   })
     .index("by_channel_feed", ["channelId", "inChannel"])
     .index("by_channel", ["channelId"])
     .index("by_parent", ["parentId"])
     .index("by_channel_pinned", ["channelId", "pinnedAt"])
+    .index("by_channel_files", ["channelId", "hasAttachments"])
+    // Hledá se nad `searchText` (bez diakritiky), dotaz projde stejnou normalizací.
     // Výsledky se vždy filtrují přes `canReadChannel` — index sám o přístupu nic neví.
-    .searchIndex("search_text", { searchField: "text", filterFields: ["channelId", "authorId"] }),
+    .searchIndex("search_text", { searchField: "searchText", filterFields: ["channelId", "authorId"] }),
 
   // Uložené zprávy („přečtu později“) — osobní, nikdo jiný je nevidí.
   chatSaved: defineTable({
@@ -521,6 +545,13 @@ export default defineSchema({
   presence: defineTable({
     userId: v.id("users"),
     lastActiveAt: v.number(),
+    /** Stav („na akci“), Nerušit a tiché hodiny — mění se zřídka, proto tady. */
+    statusEmoji: v.optional(v.string()),
+    statusText: v.optional(v.string()),
+    statusUntil: v.optional(v.number()),
+    dndUntil: v.optional(v.number()),
+    quietFrom: v.optional(v.string()), // HH:MM
+    quietTo: v.optional(v.string()),
   }).index("by_user", ["userId"]),
 
   // Kdo sleduje vlákno (autor rootu, odpovídající, zmínění) → pohled „Vlákna“.

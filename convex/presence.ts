@@ -4,6 +4,8 @@
 import { v } from "convex/values";
 import { internalMutation, mutation, query } from "./_generated/server";
 import { getCurrentUser, requireUser } from "./auth";
+import type { Id } from "./_generated/dataModel";
+import type { MutationCtx } from "./_generated/server";
 import { getMembership, requireChannelRead } from "./chatAccess";
 
 const HEARTBEAT_MIN_MS = 30_000;
@@ -26,7 +28,79 @@ export const online = query({
   handler: async (ctx) => {
     await requireUser(ctx);
     const rows = await ctx.db.query("presence").collect();
-    return rows.map((r) => ({ userId: r.userId, lastActiveAt: r.lastActiveAt }));
+    const now = Date.now();
+    return rows.map((r) => ({
+      userId: r.userId,
+      lastActiveAt: r.lastActiveAt,
+      // Vypršelý stav se prostě nevrací — nemusí se nikde uklízet.
+      statusEmoji: r.statusUntil && r.statusUntil < now ? undefined : r.statusEmoji,
+      statusText: r.statusUntil && r.statusUntil < now ? undefined : r.statusText,
+      statusUntil: r.statusUntil,
+      dndUntil: r.dndUntil && r.dndUntil > now ? r.dndUntil : undefined,
+      quietFrom: r.quietFrom,
+      quietTo: r.quietTo,
+    }));
+  },
+});
+
+/** Můj stav — pro přepínač Nerušit a tiché hodiny v hlavičce. */
+export const mine = query({
+  args: {},
+  handler: async (ctx) => {
+    const me = await getCurrentUser(ctx);
+    if (!me) return null;
+    const row = await ctx.db.query("presence").withIndex("by_user", (q) => q.eq("userId", me._id)).unique();
+    if (!row) return null;
+    return {
+      statusEmoji: row.statusEmoji, statusText: row.statusText, statusUntil: row.statusUntil,
+      dndUntil: row.dndUntil, quietFrom: row.quietFrom, quietTo: row.quietTo,
+    };
+  },
+});
+
+/** Řádek presence přihlášeného — vytvoří se, když ještě není. */
+async function myPresence(ctx: MutationCtx, userId: Id<"users">) {
+  const row = await ctx.db.query("presence").withIndex("by_user", (q) => q.eq("userId", userId)).unique();
+  if (row) return row._id;
+  return await ctx.db.insert("presence", { userId, lastActiveAt: Date.now() });
+}
+
+/** Stav („na akci“, „u klienta“) s volitelnou platností. */
+export const setStatus = mutation({
+  args: {
+    emoji: v.optional(v.union(v.string(), v.null())),
+    text: v.optional(v.union(v.string(), v.null())),
+    until: v.optional(v.union(v.number(), v.null())),
+  },
+  handler: async (ctx, args) => {
+    const me = await requireUser(ctx);
+    const id = await myPresence(ctx, me._id);
+    await ctx.db.patch(id, {
+      statusEmoji: args.emoji?.slice(0, 16) || undefined,
+      statusText: args.text?.trim().slice(0, 80) || undefined,
+      statusUntil: args.until ?? undefined,
+    });
+  },
+});
+
+/** Nerušit do daného času (`null` = zrušit). Tlumí e-maily a upozornění prohlížeče. */
+export const setDnd = mutation({
+  args: { until: v.union(v.number(), v.null()) },
+  handler: async (ctx, args) => {
+    const me = await requireUser(ctx);
+    const id = await myPresence(ctx, me._id);
+    await ctx.db.patch(id, { dndUntil: args.until ?? undefined });
+  },
+});
+
+/** Tiché hodiny `HH:MM` (např. 18:00–08:00). `null` je vypne. */
+export const setQuietHours = mutation({
+  args: { from: v.union(v.string(), v.null()), to: v.union(v.string(), v.null()) },
+  handler: async (ctx, args) => {
+    const me = await requireUser(ctx);
+    const id = await myPresence(ctx, me._id);
+    const ok = (t: string | null) => (t && /^\d{2}:\d{2}$/.test(t) ? t : undefined);
+    await ctx.db.patch(id, { quietFrom: ok(args.from), quietTo: ok(args.to) });
   },
 });
 

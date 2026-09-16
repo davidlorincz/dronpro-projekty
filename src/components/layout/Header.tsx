@@ -8,6 +8,7 @@ import { NotificationPanel } from "./NotificationPanel";
 import { useMe } from "./AuthGuard";
 import { ROLE_LABEL } from "@/lib/constants";
 import { UserAvatar } from "@/components/shared/UserAvatar";
+import { StatusMenu } from "@/components/chat/StatusMenu";
 import { cn } from "@/lib/utils";
 
 export function Header({ isDark, onToggleTheme, sidebarCollapsed, onToggleSidebar }: {
@@ -41,6 +42,7 @@ export function Header({ isDark, onToggleTheme, sidebarCollapsed, onToggleSideba
             <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Nový projekt</span>
           </Link>
         )}
+        <StatusMenu />
         <NotificationPanel />
         <button
           onClick={onToggleTheme}

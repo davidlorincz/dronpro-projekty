@@ -3,7 +3,7 @@
 // (tučný kanál) a `chatMembers.mentionCount` (badge). Vlákna mají `chatThreadFollows.unread`.
 import { v, ConvexError } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
-import { internalQuery, mutation, query } from "./_generated/server";
+import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { requireUser, type Ctx } from "./auth";
@@ -11,6 +11,8 @@ import { canReadChannel, getMembership, requireChannelRead, requireChannelWrite 
 import { notify } from "./notifications";
 import { isGiphyUrl } from "./giphy";
 import { chatGifValidator } from "./schema";
+import { foldText } from "./lib";
+import { internal } from "./_generated/api";
 import { deleteRemindersBy } from "./chatSchedule";
 
 const MAX_LEN = 4000;
@@ -273,12 +275,17 @@ export type DeliverArgs = {
   attachments?: { storageId: Id<"_storage">; name: string }[];
   poll?: Doc<"chatMessages">["poll"];
   gif?: Doc<"chatMessages">["gif"];
+  forwardedFrom?: Doc<"chatMessages">["forwardedFrom"];
 };
 
+/** Nad tímhle počtem členů se čítače a notifikace dopočítají až na pozadí. */
+const FANOUT_INLINE_MAX = 25;
+
 /**
- * Vložení zprávy + čítače nepřečtených, zmínky, vlákna a notifikace. Sdílí ho
- * `send`, ankety i naplánované odeslání (to běží bez auth kontextu, proto se
- * autor a jeho členství předávají a práva ověřuje volající).
+ * Vložení zprávy. Sdílí ho `send`, ankety, přeposlání i naplánované odeslání
+ * (to běží bez auth kontextu, proto se autor a jeho členství předávají a práva
+ * ověřuje volající). Čítače nepřečtených, notifikace a vlákna řeší `fanOutMessage` —
+ * ve velkém kanálu na pozadí, aby se odesílatel nezdržoval a mutace nepřetekla.
  */
 export async function deliverMessage(
   ctx: MutationCtx,
@@ -287,128 +294,157 @@ export async function deliverMessage(
   membership: Doc<"chatMembers">,
   args: DeliverArgs,
 ) {
-    const text = cleanText(args.text, !!args.attachments?.length || !!args.poll || !!args.gif);
-    // GIF je jen odkaz na CDN Giphy — cizí URL do zpráv nepustíme.
-    if (args.gif && !(isGiphyUrl(args.gif.url) && isGiphyUrl(args.gif.previewUrl))) {
-      throw new ConvexError("Neplatný odkaz na GIF.");
-    }
+  const text = cleanText(args.text, !!args.attachments?.length || !!args.poll || !!args.gif || !!args.forwardedFrom);
+  // GIF je jen odkaz na CDN Giphy — cizí URL do zpráv nepustíme.
+  if (args.gif && !(isGiphyUrl(args.gif.url) && isGiphyUrl(args.gif.previewUrl))) {
+    throw new ConvexError("Neplatný odkaz na GIF.");
+  }
 
-    let root: Doc<"chatMessages"> | null = null;
-    if (args.parentId) {
-      root = await ctx.db.get(args.parentId);
-      if (!root || root.channelId !== channel._id || root.parentId || root.system) throw new ConvexError("Vlákno nenalezeno.");
-    }
+  let root: Doc<"chatMessages"> | null = null;
+  if (args.parentId) {
+    root = await ctx.db.get(args.parentId);
+    if (!root || root.channelId !== channel._id || root.parentId || root.system) throw new ConvexError("Vlákno nenalezeno.");
+  }
 
-    const members = await ctx.db.query("chatMembers").withIndex("by_channel", (q) => q.eq("channelId", channel._id)).collect();
-    const memberIds = new Set<string>(members.map((m) => m.userId));
-    const mentions = parseMentions(ctx, text, memberIds, me._id);
-    const mentionsChannel = channel.kind === "channel" && text.includes("<!kanal>");
-    if (mentionsChannel && me.role !== "admin" && membership.role !== "owner") {
-      throw new ConvexError("@kanal (upozornění pro všechny) může použít jen vlastník kanálu nebo administrátor.");
-    }
-    const attachments = await validateAttachments(ctx, args.attachments ?? []);
-    const inChannel = !root || !!args.alsoInChannel;
-    const now = Date.now();
+  const members = await ctx.db.query("chatMembers").withIndex("by_channel", (q) => q.eq("channelId", channel._id)).collect();
+  const memberIds = new Set<string>(members.map((m) => m.userId));
+  const mentions = parseMentions(ctx, text, memberIds, me._id);
+  const mentionsChannel = channel.kind === "channel" && text.includes("<!kanal>");
+  if (mentionsChannel && me.role !== "admin" && membership.role !== "owner") {
+    throw new ConvexError("@kanal (upozornění pro všechny) může použít jen vlastník kanálu nebo administrátor.");
+  }
+  const attachments = await validateAttachments(ctx, args.attachments ?? []);
+  const inChannel = !root || !!args.alsoInChannel;
+  const now = Date.now();
 
-    const messageId = await ctx.db.insert("chatMessages", {
-      channelId: channel._id,
-      authorId: me._id,
-      text,
-      parentId: root?._id,
-      inChannel,
-      mentions,
-      mentionsChannel: mentionsChannel || undefined,
-      reactions: [],
-      attachments,
-      poll: args.poll,
-      gif: args.gif,
-      replyCount: 0,
-      replyUserIds: [],
-      createdAt: now,
-    });
-    for (const uid of mentions) {
-      await ctx.db.insert("chatMentions", { userId: uid, messageId, channelId: channel._id, createdAt: now });
-    }
-    const typing = await ctx.db
-      .query("chatTyping")
-      .withIndex("by_user_channel", (q) => q.eq("userId", me._id).eq("channelId", channel._id))
-      .unique();
-    if (typing) await ctx.db.delete(typing._id);
+  const messageId = await ctx.db.insert("chatMessages", {
+    channelId: channel._id,
+    authorId: me._id,
+    text,
+    searchText: foldText(text),
+    hasAttachments: attachments.length > 0,
+    parentId: root?._id,
+    inChannel,
+    mentions,
+    mentionsChannel: mentionsChannel || undefined,
+    reactions: [],
+    attachments,
+    poll: args.poll,
+    gif: args.gif,
+    forwardedFrom: args.forwardedFrom,
+    replyCount: 0,
+    replyUserIds: [],
+    createdAt: now,
+  });
+  for (const uid of mentions) {
+    await ctx.db.insert("chatMentions", { userId: uid, messageId, channelId: channel._id, createdAt: now });
+  }
+  const typing = await ctx.db
+    .query("chatTyping")
+    .withIndex("by_user_channel", (q) => q.eq("userId", me._id).eq("channelId", channel._id))
+    .unique();
+  if (typing) await ctx.db.delete(typing._id);
 
-    const who = me.name ?? me.email;
-    const where = await channelLabel(ctx, channel);
-    const body = args.poll
-      ? `📊 Anketa: ${args.poll.question}`
-      : (await plainSnippet(ctx, text)) || (args.gif ? `🎞️ GIF: ${args.gif.title}` : `📎 ${attachments.map((a) => a.name).join(", ")}`);
-    const link = root ? `/chat/${channel._id}?vlakno=${root._id}` : `/chat/${channel._id}?zprava=${messageId}`;
-    const notified = new Set<string>();
+  // Odesílatel má vždy přečteno a kanál se posune nahoru hned.
+  if (inChannel) {
+    await ctx.db.patch(channel._id, { lastMessageAt: now });
+    await ctx.db.patch(membership._id, { lastReadAt: now, mentionCount: 0 });
+  }
 
-    // Zmínka ve vlákně bez „poslat i do kanálu“ — kanál se nepřečteným nestane,
-    // zmíněný ale notifikaci dostat musí.
-    if (!inChannel) {
-      for (const uid of mentions) {
-        notified.add(uid);
-        await notify(ctx, { userId: uid, type: "chat_mention", title: `${who} tě zmínil(a) ve vlákně v ${where}`, body, link });
-      }
-    }
-
-    if (inChannel) {
-      await ctx.db.patch(channel._id, { lastMessageAt: now });
-      for (const m of members) {
-        if (m.userId === me._id) {
-          await ctx.db.patch(m._id, { lastReadAt: now, mentionCount: 0 });
-          continue;
-        }
-        const isMention = mentionsChannel || mentions.includes(m.userId);
-        if (channel.kind === "dm" || isMention) await ctx.db.patch(m._id, { mentionCount: m.mentionCount + 1 });
-
-        const level = m.notify ?? (channel.kind === "dm" ? "all" : "mentions");
-        if (level === "none" || (m.muted && !isMention)) continue;
-        notified.add(m.userId);
-        if (channel.kind === "dm") {
-          await notify(ctx, { userId: m.userId, type: "chat_dm", title: `${who} ti napsal(a) v ${where}`, body, link });
-        } else if (isMention) {
-          await notify(ctx, { userId: m.userId, type: "chat_mention", title: `${who} tě zmínil(a) v ${where}`, body, link });
-        } else if (level === "all") {
-          await notify(ctx, { userId: m.userId, type: "chat_channel_message", title: `${who} napsal(a) do ${where}`, body, link });
-        }
-      }
-    }
-
-    if (root) {
-      await ctx.db.patch(root._id, {
-        replyCount: root.replyCount + 1,
-        lastReplyAt: now,
-        replyUserIds: [me._id, ...root.replyUserIds.filter((id) => id !== me._id)].slice(0, 5),
-      });
-      // Vlákno automaticky sleduje autor rootu, každý odpovídající a zmínění.
-      await upsertFollow(ctx, root, me._id, { unread: false, lastReplyAt: now });
-      if (!root.system && root.authorId !== me._id && memberIds.has(root.authorId)) {
-        const has = await ctx.db
-          .query("chatThreadFollows")
-          .withIndex("by_root_user", (q) => q.eq("rootId", root._id).eq("userId", root.authorId))
-          .unique();
-        if (!has) await upsertFollow(ctx, root, root.authorId, { unread: false, lastReplyAt: root.createdAt });
-      }
-      for (const uid of mentions) {
-        const has = await ctx.db
-          .query("chatThreadFollows")
-          .withIndex("by_root_user", (q) => q.eq("rootId", root._id).eq("userId", uid))
-          .unique();
-        if (!has) await upsertFollow(ctx, root, uid, { unread: false, lastReplyAt: now });
-      }
-      const follows = await ctx.db.query("chatThreadFollows").withIndex("by_root", (q) => q.eq("rootId", root._id)).collect();
-      for (const f of follows) {
-        if (f.userId === me._id) continue;
-        await ctx.db.patch(f._id, { unread: true, lastReplyAt: now });
-        // Notifikace jen při prvním nepřečteném — živé vlákno by jinak zasypalo zvoneček.
-        if (!f.unread && !notified.has(f.userId) && memberIds.has(f.userId)) {
-          await notify(ctx, { userId: f.userId, type: "chat_thread_reply", title: `${who} odpověděl(a) ve vlákně v ${where}`, body, link });
-        }
-      }
-    }
-    return messageId;
+  if (members.length > FANOUT_INLINE_MAX) {
+    await ctx.scheduler.runAfter(0, internal.chatMessages.fanOut, { messageId });
+  } else {
+    await fanOutMessage(ctx, messageId);
+  }
+  return messageId;
 }
+
+/**
+ * Čítače nepřečtených, notifikace a stav vláken pro jednu zprávu.
+ * Čte se znovu z databáze, takže mezitím smazaná zpráva fan-out zruší.
+ */
+export async function fanOutMessage(ctx: MutationCtx, messageId: Id<"chatMessages">) {
+  const msg = await ctx.db.get(messageId);
+  if (!msg || msg.deletedAt) return;
+  const [channel, me] = await Promise.all([ctx.db.get(msg.channelId), ctx.db.get(msg.authorId)]);
+  if (!channel || !me) return;
+
+  const members = await ctx.db.query("chatMembers").withIndex("by_channel", (q) => q.eq("channelId", channel._id)).collect();
+  const memberIds = new Set<string>(members.map((m) => m.userId));
+  const root = msg.parentId ? await ctx.db.get(msg.parentId) : null;
+
+  const who = me.name ?? me.email;
+  const where = await channelLabel(ctx, channel);
+  const body = msg.poll
+    ? `📊 Anketa: ${msg.poll.question}`
+    : (await plainSnippet(ctx, msg.text)) || (msg.gif ? `🎞️ GIF: ${msg.gif.title}` : `📎 ${msg.attachments.map((a) => a.name).join(", ")}`);
+  const link = root ? `/chat/${channel._id}?vlakno=${root._id}` : `/chat/${channel._id}?zprava=${msg._id}`;
+  const notified = new Set<string>();
+
+  // Zmínka ve vlákně bez „poslat i do kanálu“ — kanál se nepřečteným nestane,
+  // zmíněný ale notifikaci dostat musí.
+  if (!msg.inChannel) {
+    for (const uid of msg.mentions) {
+      notified.add(uid);
+      await notify(ctx, { userId: uid, type: "chat_mention", title: `${who} tě zmínil(a) ve vlákně v ${where}`, body, link });
+    }
+  }
+
+  if (msg.inChannel) {
+    for (const m of members) {
+      if (m.userId === me._id) continue;
+      const isMention = !!msg.mentionsChannel || msg.mentions.includes(m.userId);
+      if (channel.kind === "dm" || isMention) await ctx.db.patch(m._id, { mentionCount: m.mentionCount + 1 });
+
+      const level = m.notify ?? (channel.kind === "dm" ? "all" : "mentions");
+      if (level === "none" || (m.muted && !isMention)) continue;
+      notified.add(m.userId);
+      if (channel.kind === "dm") {
+        await notify(ctx, { userId: m.userId, type: "chat_dm", title: `${who} ti napsal(a) v ${where}`, body, link });
+      } else if (isMention) {
+        await notify(ctx, { userId: m.userId, type: "chat_mention", title: `${who} tě zmínil(a) v ${where}`, body, link });
+      } else if (level === "all") {
+        await notify(ctx, { userId: m.userId, type: "chat_channel_message", title: `${who} napsal(a) do ${where}`, body, link });
+      }
+    }
+  }
+
+  if (root) {
+    await ctx.db.patch(root._id, {
+      replyCount: root.replyCount + 1,
+      lastReplyAt: msg.createdAt,
+      replyUserIds: [me._id, ...root.replyUserIds.filter((id) => id !== me._id)].slice(0, 5),
+    });
+    // Vlákno automaticky sleduje autor rootu, každý odpovídající a zmínění.
+    await upsertFollow(ctx, root, me._id, { unread: false, lastReplyAt: msg.createdAt });
+    const ensureFollow = async (uid: Id<"users">, lastReplyAt: number) => {
+      const has = await ctx.db
+        .query("chatThreadFollows")
+        .withIndex("by_root_user", (q) => q.eq("rootId", root._id).eq("userId", uid))
+        .unique();
+      if (!has) await upsertFollow(ctx, root, uid, { unread: false, lastReplyAt });
+    };
+    if (!root.system && root.authorId !== me._id && memberIds.has(root.authorId)) await ensureFollow(root.authorId, root.createdAt);
+    for (const uid of msg.mentions) await ensureFollow(uid, msg.createdAt);
+
+    const follows = await ctx.db.query("chatThreadFollows").withIndex("by_root", (q) => q.eq("rootId", root._id)).collect();
+    for (const f of follows) {
+      if (f.userId === me._id) continue;
+      await ctx.db.patch(f._id, { unread: true, lastReplyAt: msg.createdAt });
+      // Notifikace jen při prvním nepřečteném — živé vlákno by jinak zasypalo zvoneček.
+      if (!f.unread && !notified.has(f.userId) && memberIds.has(f.userId)) {
+        await notify(ctx, { userId: f.userId, type: "chat_thread_reply", title: `${who} odpověděl(a) ve vlákně v ${where}`, body, link });
+      }
+    }
+  }
+}
+
+export const fanOut = internalMutation({
+  args: { messageId: v.id("chatMessages") },
+  handler: async (ctx, args) => {
+    await fanOutMessage(ctx, args.messageId);
+  },
+});
 
 export const send = mutation({
   args: {
@@ -422,6 +458,33 @@ export const send = mutation({
   handler: async (ctx, args) => {
     const { me, channel, membership } = await requireChannelWrite(ctx, args.channelId);
     return await deliverMessage(ctx, me, channel, membership, args);
+  },
+});
+
+/**
+ * Přeposlání zprávy jinam. Ukládá se **snímek** originálu (text, autor, čas),
+ * ne kopie příloh — bloby tak nezůstanou viset na dvou místech a smazání
+ * originálu nerozbije přeposlanou zprávu.
+ */
+export const forward = mutation({
+  args: { messageId: v.id("chatMessages"), targetChannelId: v.id("chatChannels"), note: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const src = await ctx.db.get(args.messageId);
+    if (!src || src.system || src.deletedAt) throw new ConvexError("Zpráva nenalezena.");
+    await requireChannelRead(ctx, src.channelId); // vidím originál?
+    const { me, channel, membership } = await requireChannelWrite(ctx, args.targetChannelId);
+    return await deliverMessage(ctx, me, channel, membership, {
+      text: args.note?.trim() ?? "",
+      forwardedFrom: {
+        messageId: src._id,
+        channelId: src.channelId,
+        authorId: src.authorId,
+        createdAt: src.createdAt,
+        text: src.poll ? `📊 ${src.poll.question}` : src.text.slice(0, 2000),
+        attachmentCount: src.attachments.length,
+        gif: src.gif,
+      },
+    });
   },
 });
 
@@ -448,7 +511,7 @@ export const edit = mutation({
         link,
       });
     }
-    await ctx.db.patch(msg._id, { text, mentions, editedAt: now });
+    await ctx.db.patch(msg._id, { text, searchText: foldText(text), mentions, editedAt: now });
   },
 });
 
@@ -469,7 +532,8 @@ export const remove = mutation({
     // Root s odpověďmi zůstává jako „Zpráva byla smazána“, jinak by vlákno osiřelo.
     if (!msg.parentId && msg.replyCount > 0) {
       await ctx.db.patch(msg._id, {
-        text: "", attachments: [], reactions: [], mentions: [], pinnedAt: undefined, pinnedBy: undefined, poll: undefined, gif: undefined, deletedAt: Date.now(),
+        text: "", attachments: [], reactions: [], mentions: [], pinnedAt: undefined, pinnedBy: undefined, poll: undefined, gif: undefined, forwardedFrom: undefined,
+        searchText: undefined, hasAttachments: false, deletedAt: Date.now(),
       });
       return;
     }

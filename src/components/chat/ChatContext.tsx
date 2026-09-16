@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../convex/_generated/api";
@@ -27,9 +27,18 @@ type ChatCtx = {
   reminderByMessage: Map<string, { _id: Id<"chatReminders">; remindAt: number }>;
   scheduled: FunctionReturnType<typeof api.chatSchedule.myScheduled>;
   isOnline: (id: string) => boolean;
+  /** Stav člověka („na akci“) a Nerušit z tabulky `presence`. */
+  statusOf: (id: string) => { emoji?: string; text?: string; dndUntil?: number } | undefined;
+  myPresence: { statusEmoji?: string; statusText?: string; statusUntil?: number; dndUntil?: number; quietFrom?: string; quietTo?: string } | undefined;
+  /** Composer se registruje sám; menu zprávy a profil přes tohle vkládají citace a zmínky. */
+  registerComposer: (api: ComposerApi) => () => void;
+  insertToComposer: (text: string) => void;
+  mentionInComposer: (label: string, id: string) => void;
   /** „#marketing“ / „Petr, Jana“ / „Poznámky pro sebe“. */
   channelTitle: (c: { kind: "channel" | "dm"; name?: string; dmUserIds: string[] }) => string;
 };
+
+export type ComposerApi = { insert: (text: string) => void; mention: (label: string, id: string) => void };
 
 const Ctx = createContext<ChatCtx | null>(null);
 
@@ -57,6 +66,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const scheduled = useQuery(api.chatSchedule.myScheduled);
   // Query se s plynoucím časem sama nepřepočítá — „online“ vyhodnocujeme proti vlastním hodinám.
   const [now, setNow] = useState(() => Date.now());
+  const composerApi = useRef<ComposerApi | null>(null);
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(t);
@@ -67,6 +77,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     const channelMap = new Map((sidebar?.channels ?? []).map((c) => [c._id as string, c]));
     const userName = (id: string) => displayName(userMap.get(id));
     const online = new Set((presence ?? []).filter((p) => now - p.lastActiveAt < ONLINE_MS).map((p) => p.userId as string));
+    const presenceById = new Map((presence ?? []).map((p) => [p.userId as string, p]));
     return {
       me,
       users: users ?? [],
@@ -80,6 +91,18 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       reminderByMessage: new Map((reminders ?? []).map((r) => [r.messageId as string, { _id: r._id, remindAt: r.remindAt }])),
       scheduled: scheduled ?? [],
       isOnline: (id) => online.has(id),
+      statusOf: (id) => {
+        const p = presenceById.get(id);
+        if (!p) return undefined;
+        return { emoji: p.statusEmoji, text: p.statusText, dndUntil: p.dndUntil };
+      },
+      myPresence: presenceById.get(me._id),
+      registerComposer: (api: ComposerApi) => {
+        composerApi.current = api;
+        return () => { if (composerApi.current === api) composerApi.current = null; };
+      },
+      insertToComposer: (text: string) => composerApi.current?.insert(text),
+      mentionInComposer: (label: string, id: string) => composerApi.current?.mention(label, id),
       channelTitle: (c) => {
         if (c.kind === "channel") return c.name ?? "kanál";
         if (!c.dmUserIds.length) return "Poznámky pro sebe";

@@ -55,7 +55,7 @@ export function Composer({
   onEditLast?: () => void;
   autoFocus?: boolean;
 }) {
-  const { me, userMap, sidebar, customEmoji } = useChat();
+  const { me, userMap, sidebar, customEmoji, registerComposer } = useChat();
   const router = useRouter();
   const scheduleSend = useMutation(api.chatSchedule.schedule);
   const [pollOpen, setPollOpen] = useState(false);
@@ -127,6 +127,27 @@ export function Composer({
       }
     }
   };
+
+  // Registrace pro citace a zmínky z menu zprávy / profilu.
+  useEffect(() => registerComposer({
+    insert: (value: string) => {
+      setText((t) => {
+        const next = t && !t.endsWith("\n") ? `${t}\n${value}` : `${t}${value}`;
+        writeDraft(draftKey, next);
+        return next;
+      });
+      requestAnimationFrame(() => areaRef.current?.focus());
+    },
+    mention: (label: string, id: string) => {
+      setPicked((p) => new Map(p).set(label, id));
+      setText((t) => {
+        const next = `${t}${t && !/\s$/.test(t) ? " " : ""}@${label} `;
+        writeDraft(draftKey, next);
+        return next;
+      });
+      requestAnimationFrame(() => areaRef.current?.focus());
+    },
+  }), [registerComposer, draftKey]);
 
   useImperativeHandle(ref, () => ({
     addFiles: (files) => void addFiles(files),

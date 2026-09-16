@@ -13,6 +13,7 @@ import {
 } from "./schema";
 import { logActivity, fieldLabel } from "./activity";
 import { notify, notifyAdmins } from "./notifications";
+import { postEntityUpdate } from "./chatLinks";
 import {
   enrichProject,
   enrichSubtask,
@@ -282,6 +283,13 @@ export const setStatus = mutation({
     patch.blockedReason = args.status === "blocked" ? args.blockedReason : undefined;
     await diffAndLog(ctx, me, before, patch);
     await ctx.db.patch(args.id, { ...patch, updatedAt: Date.now() });
+    if (args.status !== before.status) {
+      await postEntityUpdate(ctx, {
+        projectId: args.id,
+        actorId: me._id,
+        text: `<@${me._id}> změnil(a) stav projektu na ${STATUS_LABEL[args.status]}${args.status === "blocked" && args.blockedReason ? ` — ${args.blockedReason.trim()}` : ""}`,
+      });
+    }
   },
 });
 

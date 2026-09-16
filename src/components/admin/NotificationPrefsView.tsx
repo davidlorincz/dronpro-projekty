@@ -7,6 +7,7 @@ import { NOTIFICATION_TYPES, resolvePref, type NotificationPref } from "@/lib/no
 import { errorToast } from "@/lib/convexError";
 import { Bell, Mail } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { NotificationPermissionButton } from "@/components/chat/ChatNotifier";
 
 export function NotificationPrefsView() {
   const { me, isAdmin } = useMe();
@@ -29,6 +30,10 @@ export function NotificationPrefsView() {
       <div>
         <h1 className="text-2xl">Moje notifikace</h1>
         <p className="text-sm text-a-text-3">Vyber, na jaké události chceš být upozorněn a jakým kanálem. Změny se ukládají hned. E-maily chodí na <b>{me.email}</b>.</p>
+      </div>
+      <div className="card flex flex-wrap items-center gap-3 p-4 text-sm text-a-text-3">
+        <NotificationPermissionButton />
+        <span>Upozornění na zmínky a přímé zprávy se ukážou, i když máš appku na jiné záložce. V režimu Nerušit a v tichých hodinách (ikona u tvého jména nahoře) jsou potichu.</span>
       </div>
       <div className="card overflow-x-auto">
         <table className="w-full text-sm">

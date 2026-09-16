@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ShareToChatButton } from "@/components/chat/ShareToChat";
+import { EntityChannelButton } from "@/components/chat/EntityChannelButton";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -64,7 +65,8 @@ export function ProjectDetail({ id }: { id: Id<"projects"> }) {
     <div className="max-w-[1400px] space-y-5">
       <div className="flex items-center gap-2 text-sm text-a-text-3">
         <Link href={project.archivedAt ? "/archiv" : project.isBacklog ? "/projekty?scope=backlog" : "/projekty"} className="inline-flex items-center gap-1 hover:text-a-text"><ArrowLeft className="h-4 w-4" /> {project.archivedAt ? "Archiv" : project.isBacklog ? "Backlog" : "Portfolio"}</Link>
-        <ShareToChatButton path={`/projekty/${id}`} name={project.name} className="ml-auto" />
+        <EntityChannelButton projectId={id} canCreate={editable} className="ml-auto" />
+        <ShareToChatButton path={`/projekty/${id}`} name={project.name} />
       </div>
 
       {project.archivedAt && (

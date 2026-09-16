@@ -7,6 +7,7 @@ import { requireUser, type Ctx } from "./auth";
 import { canReadChannel, getMembership, requireChannelRead, requireChannelWrite } from "./chatAccess";
 import { canSeeProject, projectScope, type ProjectScope } from "./access";
 import { insertSystemMessage } from "./chat";
+import { foldText } from "./lib";
 import { withUrls } from "./chatMessages";
 
 /** Cache přístupu ke kanálům v rámci jednoho dotazu (výsledky hledání bývají z pár kanálů). */
@@ -45,24 +46,48 @@ export const search = query({
   },
   handler: async (ctx, args) => {
     const me = await requireUser(ctx);
-    const q = args.q.trim();
-    if (q.length < 2) return [];
-    const rows = await ctx.db
-      .query("chatMessages")
-      .withSearchIndex("search_text", (s) => {
-        const base = s.search("text", q);
-        const withChannel = args.channelId ? base.eq("channelId", args.channelId) : base;
-        return args.authorId ? withChannel.eq("authorId", args.authorId) : withChannel;
-      })
-      .take(200);
+    const q = foldText(args.q.trim());
     const read = channelReader(ctx, me);
-    const out = [];
-    for (const m of rows) {
-      if (m.system || m.deletedAt) continue;
-      const c = await read(m.channelId);
-      if (!c) continue;
-      out.push(listItem(m, c));
-      if (out.length >= 50) break;
+    const out: ReturnType<typeof listItem>[] = [];
+
+    // Bez textu, ale s filtrem — vypiš poslední zprávy („všechno od Moniky“).
+    if (q.length < 2) {
+      if (!args.channelId && !args.authorId) return [];
+      const rows = args.channelId
+        ? await ctx.db.query("chatMessages").withIndex("by_channel", (x) => x.eq("channelId", args.channelId!)).order("desc").take(400)
+        : await ctx.db.query("chatMessages").order("desc").take(400);
+      for (const m of rows) {
+        if (m.system || m.deletedAt) continue;
+        if (args.authorId && m.authorId !== args.authorId) continue;
+        const c = await read(m.channelId);
+        if (!c) continue;
+        out.push(listItem(m, c));
+        if (out.length >= 50) break;
+      }
+      return out;
+    }
+
+    // Stránkujeme, protože filtrovat přístup až po `take()` by výsledky ořezalo
+    // dřív, než se vůbec zjistí, které z nich uživatel smí vidět.
+    let cursor: string | null = null;
+    for (let page = 0; page < 5 && out.length < 50; page++) {
+      const res = await ctx.db
+        .query("chatMessages")
+        .withSearchIndex("search_text", (search) => {
+          const base = search.search("searchText", q);
+          const withChannel = args.channelId ? base.eq("channelId", args.channelId) : base;
+          return args.authorId ? withChannel.eq("authorId", args.authorId) : withChannel;
+        })
+        .paginate({ numItems: 100, cursor });
+      for (const m of res.page) {
+        if (m.system || m.deletedAt) continue;
+        const c = await read(m.channelId);
+        if (!c) continue;
+        out.push(listItem(m, c));
+        if (out.length >= 50) break;
+      }
+      if (res.isDone) break;
+      cursor = res.continueCursor;
     }
     return out;
   },
@@ -125,7 +150,7 @@ export const savedIds = query({
   args: {},
   handler: async (ctx) => {
     const me = await requireUser(ctx);
-    const rows = await ctx.db.query("chatSaved").withIndex("by_user", (q) => q.eq("userId", me._id)).order("desc").take(500);
+    const rows = await ctx.db.query("chatSaved").withIndex("by_user", (q) => q.eq("userId", me._id)).order("desc").take(1000);
     return rows.map((r) => r.messageId);
   },
 });
@@ -156,9 +181,9 @@ export const files = query({
     await requireChannelRead(ctx, args.channelId);
     const rows = await ctx.db
       .query("chatMessages")
-      .withIndex("by_channel", (q) => q.eq("channelId", args.channelId))
+      .withIndex("by_channel_files", (q) => q.eq("channelId", args.channelId).eq("hasAttachments", true))
       .order("desc")
-      .take(1000);
+      .take(200);
     const out = [];
     for (const m of rows) {
       if (!m.attachments.length || m.deletedAt) continue;

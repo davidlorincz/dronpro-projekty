@@ -5,7 +5,7 @@ import { useMutation } from "convex/react";
 import * as Popover from "@radix-ui/react-popover";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { Bookmark, BookmarkCheck, CornerDownRight, Download, EyeOff, FileText, Link2, MessageSquareReply, MoreHorizontal, Pencil, Pin, PinOff, SmilePlus, AlarmClock, AlarmClockOff, Trash2, Info } from "lucide-react";
+import { Bookmark, BookmarkCheck, CornerDownRight, ListPlus, Quote, Share2, Download, EyeOff, FileText, Link2, MessageSquareReply, MoreHorizontal, Pencil, Pin, PinOff, SmilePlus, AlarmClock, AlarmClockOff, Trash2, Info } from "lucide-react";
 import { UserAvatar, UserAvatars } from "@/components/shared/UserAvatar";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { errorToast } from "@/lib/convexError";
@@ -22,6 +22,10 @@ import { EmojiGlyph } from "./EmojiGlyph";
 import { useLightbox } from "./Lightbox";
 import { PollCard } from "./Poll";
 import { WhenDialog } from "./WhenDialog";
+import { ForwardDialog } from "./ForwardDialog";
+import { SubtaskFromMessageDialog } from "./SubtaskFromMessageDialog";
+import { UserProfilePopover } from "./UserProfilePopover";
+import { longPressHandlers, useCoarsePointer } from "./usePointer";
 import { REMINDER_PRESETS, formatWhen } from "./when";
 import { QUICK_REACTIONS } from "./emoji";
 import { decodeMessage, encodeMessage, pluralReplies } from "./tokens";
@@ -48,7 +52,7 @@ export function MessageItem({
   onOpenThread?: (rootId: Id<"chatMessages">) => void;
   onMarkedUnread?: () => void;
 }) {
-  const { me, userMap, userName, channelMap, savedIds, reminderByMessage } = useChat();
+  const { me, userMap, userName, channelMap, savedIds, reminderByMessage, insertToComposer, statusOf } = useChat();
   const toggleReaction = useMutation(api.chatMessages.toggleReaction);
   const edit = useMutation(api.chatMessages.edit);
   const remove = useMutation(api.chatMessages.remove);
@@ -59,12 +63,16 @@ export function MessageItem({
   const setReminder = useMutation(api.chatSchedule.setReminder);
   const cancelReminder = useMutation(api.chatSchedule.cancelReminder);
   const [reminderOpen, setReminderOpen] = useState(false);
+  const [forwardOpen, setForwardOpen] = useState(false);
+  const [subtaskOpen, setSubtaskOpen] = useState(false);
+  const coarse = useCoarsePointer();
   const [menuOpen, setMenuOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [draft, setDraft] = useState<{ plain: string; picked: Map<string, string> } | null>(null);
 
   const author = userMap.get(m.authorId);
+  const statusFor = statusOf(m.authorId)?.emoji ? statusOf(m.authorId) : undefined;
   const mine = m.authorId === me._id;
   const deleted = !!m.deletedAt;
   const saved = savedIds.has(m._id);
@@ -109,6 +117,14 @@ export function MessageItem({
     } catch (e) { errorToast(e); }
   };
 
+  /** Text zprávy bez tokenů — pro citaci a pro předvyplnění subúkolu. */
+  const plainText = decodeMessage(m.text, userName, (id) => channelMap.get(id)?.name).plain;
+
+  const quote = () => {
+    const body = plainText.length > 300 ? `${plainText.slice(0, 300)}…` : plainText;
+    insertToComposer(`> ${displayName(author)}: ${body.replace(/\n/g, "\n> ")}\n`);
+  };
+
   const copyLink = async () => {
     const path = m.parentId ? `/chat/${m.channelId}?vlakno=${m.parentId}` : `/chat/${m.channelId}?zprava=${m._id}`;
     try {
@@ -117,11 +133,12 @@ export function MessageItem({
     } catch { toast("Odkaz se nepodařilo zkopírovat"); }
   };
 
-  const toolbarVisible = menuOpen || pickerOpen;
+  const toolbarVisible = menuOpen || pickerOpen || coarse;
 
   return (
     <div
       id={`msg-${m._id}`}
+      {...(coarse && !deleted ? longPressHandlers(() => setMenuOpen(true)) : {})}
       className={cn(
         "group relative flex gap-3 px-4 transition-colors hover:bg-a-hover",
         compact ? "py-0.5" : "pt-2 pb-0.5",
@@ -136,7 +153,11 @@ export function MessageItem({
             {timeOnly(m.createdAt)}
           </span>
         ) : author ? (
-          <UserAvatar user={author} size="md" className="mt-0.5 h-9 w-9" />
+          <UserProfilePopover user={author}>
+            <button type="button" className="cursor-pointer" title={`Profil: ${displayName(author)}`}>
+              <UserAvatar user={author} size="md" className="mt-0.5 h-9 w-9" />
+            </button>
+          </UserProfilePopover>
         ) : (
           <span className="mt-0.5 block h-9 w-9 rounded-full bg-a-elevated" />
         )}
@@ -158,7 +179,16 @@ export function MessageItem({
         )}
         {!compact && (
           <div className="flex items-baseline gap-2">
-            <span className="truncate text-sm font-semibold text-a-text">{displayName(author)}</span>
+            {author ? (
+              <UserProfilePopover user={author}>
+                <button type="button" className="truncate text-sm font-semibold text-a-text hover:underline cursor-pointer">
+                  {displayName(author)}
+                </button>
+              </UserProfilePopover>
+            ) : (
+              <span className="truncate text-sm font-semibold text-a-text">{displayName(author)}</span>
+            )}
+            {statusFor && <span title={statusFor.text}>{statusFor.emoji}</span>}
             <span className="shrink-0 text-xs text-a-text-4" title={formatDateTime(m.createdAt)}>{timeOnly(m.createdAt)}</span>
           </div>
         )}
@@ -191,6 +221,23 @@ export function MessageItem({
           </div>
         ) : (
           <>
+            {m.forwardedFrom && (
+              <div className="my-1 rounded-lg border-l-4 border-a-border bg-a-elevated/60 px-3 py-2">
+                <div className="mb-0.5 flex items-center gap-1.5 text-xs text-a-text-4">
+                  <Share2 className="h-3 w-3" /> Přeposláno od <span className="font-medium text-a-text-3">{userName(m.forwardedFrom.authorId)}</span>
+                  <span>·</span>
+                  <a href={`/chat/${m.forwardedFrom.channelId}?zprava=${m.forwardedFrom.messageId}`} className="hover:underline">originál</a>
+                </div>
+                <MessageText text={m.forwardedFrom.text} className="text-a-text-2" />
+                {!!m.forwardedFrom.attachmentCount && (
+                  <div className="mt-1 text-xs text-a-text-4">{m.forwardedFrom.attachmentCount} příloh zůstalo v původní konverzaci</div>
+                )}
+                {m.forwardedFrom.gif && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={m.forwardedFrom.gif.previewUrl} alt={m.forwardedFrom.gif.title} className="mt-1 block max-h-40 w-auto rounded-lg" />
+                )}
+              </div>
+            )}
             {m.poll ? (
               <PollCard message={m} canVote={canWrite} canClose={m.authorId === me._id || canModerate} />
             ) : (
@@ -311,6 +358,13 @@ export function MessageItem({
                 {mine && canWrite && !m.poll && (
                   <MenuItem icon={Pencil} label="Upravit zprávu" onClick={() => { setMenuOpen(false); onStartEdit(); }} />
                 )}
+                {canWrite && (
+                  <MenuItem icon={Quote} label="Citovat v odpovědi" onClick={() => { setMenuOpen(false); quote(); }} />
+                )}
+                <MenuItem icon={Share2} label="Přeposlat do…" onClick={() => { setMenuOpen(false); setForwardOpen(true); }} />
+                {canWrite && !m.poll && (
+                  <MenuItem icon={ListPlus} label="Založit subúkol…" onClick={() => { setMenuOpen(false); setSubtaskOpen(true); }} />
+                )}
                 <MenuItem icon={Link2} label="Zkopírovat odkaz" onClick={() => { setMenuOpen(false); void copyLink(); }} />
                 {reminder ? (
                   <MenuItem icon={AlarmClockOff} label={`Zrušit připomínku (${formatWhen(reminder.remindAt)})`} onClick={async () => {
@@ -341,6 +395,8 @@ export function MessageItem({
         </div>
       )}
 
+      {forwardOpen && <ForwardDialog message={m} onClose={() => setForwardOpen(false)} />}
+      {subtaskOpen && <SubtaskFromMessageDialog message={m} plainText={plainText} onClose={() => setSubtaskOpen(false)} />}
       {reminderOpen && (
         <WhenDialog
           title="Připomenout zprávu"

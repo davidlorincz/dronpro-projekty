@@ -4,13 +4,20 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import * as Popover from "@radix-ui/react-popover";
-import { AtSign, BellOff, Bookmark, ChevronDown, Compass, Hash, Lock, MessagesSquare, Plus, Search, SquarePen, Star, Clock } from "lucide-react";
+import { AtSign, BellOff, Bookmark, ChevronDown, Compass, Hash, Lock, MessagesSquare, Plus, Search, SquarePen, Star, Clock, CheckCheck, Filter, Keyboard } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useChat, type SidebarChannel } from "./ChatContext";
 import { BrowseChannelsDialog, CreateChannelDialog, NewMessageDialog } from "./ChatDialogs";
 import { PresenceAvatar } from "./PresenceAvatar";
+import { NotificationPermissionButton } from "./ChatNotifier";
+import { ShortcutsDialog } from "./ShortcutsDialog";
+import { useMutation } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+import { errorToast } from "@/lib/convexError";
+import { toast } from "@/lib/toast";
 
 const COLLAPSE_KEY = "chat-sidebar-collapsed";
+const UNREAD_ONLY_KEY = "chat-unread-only";
 
 /** Pořadí v bočním panelu — sdílí ho i Alt+↑/↓. */
 export function orderSidebar(channels: SidebarChannel[]) {
@@ -27,11 +34,16 @@ export function ChatSidebar() {
   const [dialog, setDialog] = useState<null | "create" | "browse" | "dm">(null);
   const [addOpen, setAddOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [unreadOnly, setUnreadOnly] = useState(false);
+  const [shortcuts, setShortcuts] = useState(false);
+  const markAllRead = useMutation(api.chat.markAllRead);
 
   useEffect(() => {
     try {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- načtení z localStorage až po hydrataci
       setCollapsed(JSON.parse(localStorage.getItem(COLLAPSE_KEY) ?? "{}"));
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- načtení z localStorage až po hydrataci
+      setUnreadOnly(localStorage.getItem(UNREAD_ONLY_KEY) === "1");
     } catch { /* bez localStorage */ }
   }, []);
   const toggle = (key: string) => {
@@ -40,15 +52,46 @@ export function ChatSidebar() {
     try { localStorage.setItem(COLLAPSE_KEY, JSON.stringify(next)); } catch { /* bez localStorage */ }
   };
 
-  const { starred, regular, dms } = orderSidebar(sidebar?.channels ?? []);
+  const all = sidebar?.channels ?? [];
+  // Aktivní kanál zůstává vidět, i když je přečtený — jinak by zmizel pod rukama.
+  const visible = unreadOnly
+    ? all.filter((c) => c.unread || c.mentionCount > 0 || pathname === `/chat/${c._id}`)
+    : all;
+  const { starred, regular, dms } = orderSidebar(visible);
+  const hasUnread = all.some((c) => c.unread || c.mentionCount > 0);
 
   return (
     <div className="flex h-full flex-col">
       <div className="flex h-14 shrink-0 items-center justify-between border-b border-a-border px-4">
         <div className="font-semibold text-a-text">Chat</div>
-        <button type="button" onClick={() => setDialog("dm")} className="rounded-lg p-1.5 text-a-text-3 hover:bg-a-hover hover:text-a-text cursor-pointer" title="Nová zpráva">
-          <SquarePen className="h-4 w-4" />
-        </button>
+        <div className="flex items-center gap-0.5">
+          <button
+            type="button" title={unreadOnly ? "Zobrazit všechny konverzace" : "Zobrazit jen nepřečtené"}
+            onClick={() => {
+              const next = !unreadOnly;
+              setUnreadOnly(next);
+              try { localStorage.setItem(UNREAD_ONLY_KEY, next ? "1" : "0"); } catch { /* bez localStorage */ }
+            }}
+            className={cn("rounded-lg p-1.5 hover:bg-a-hover cursor-pointer", unreadOnly ? "text-a-accent-text" : "text-a-text-3 hover:text-a-text")}
+          >
+            <Filter className="h-4 w-4" />
+          </button>
+          <button
+            type="button" title="Označit vše jako přečtené" disabled={!hasUnread}
+            onClick={async () => {
+              try {
+                const n = await markAllRead();
+                toast(n ? `Přečteno: ${n} konverzací` : "Všechno už bylo přečtené", "success");
+              } catch (e) { errorToast(e); }
+            }}
+            className="rounded-lg p-1.5 text-a-text-3 hover:bg-a-hover hover:text-a-text disabled:opacity-30 cursor-pointer disabled:cursor-default"
+          >
+            <CheckCheck className="h-4 w-4" />
+          </button>
+          <button type="button" onClick={() => setDialog("dm")} className="rounded-lg p-1.5 text-a-text-3 hover:bg-a-hover hover:text-a-text cursor-pointer" title="Nová zpráva">
+            <SquarePen className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
       <nav className="min-h-0 flex-1 overflow-y-auto px-2 py-3">
@@ -120,6 +163,14 @@ export function ChatSidebar() {
           </>
         )}
       </nav>
+
+      <div className="shrink-0 space-y-2 border-t border-a-border px-3 py-2">
+        <NotificationPermissionButton className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-a-border px-2 py-1.5 text-[11px] font-medium text-a-text-3 hover:bg-a-hover hover:text-a-text cursor-pointer" />
+        <button type="button" onClick={() => setShortcuts(true)} className="flex w-full items-center justify-center gap-1.5 text-[11px] text-a-text-4 hover:text-a-text cursor-pointer">
+          <Keyboard className="h-3.5 w-3.5" /> Klávesové zkratky
+        </button>
+      </div>
+      {shortcuts && <ShortcutsDialog onClose={() => setShortcuts(false)} />}
 
       <CreateChannelDialog open={dialog === "create"} onClose={() => setDialog(null)} />
       <BrowseChannelsDialog open={dialog === "browse"} onClose={() => setDialog(null)} onCreate={() => setDialog("create")} />

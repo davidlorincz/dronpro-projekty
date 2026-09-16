@@ -5,6 +5,7 @@ import type { MutationCtx } from "./_generated/server";
 import { requireUser } from "./auth";
 import { internal } from "./_generated/api";
 import { resolvePref } from "./notificationTypes";
+import { isQuietNow } from "./lib";
 
 /**
  * Doručí notifikaci uživateli podle jeho preferencí (in-app a/nebo e-mail).
@@ -46,7 +47,13 @@ export async function notify(
       createdAt: Date.now(),
     });
   }
-  if (pref.email && user.email) {
+  // Nerušit a tiché hodiny tlumí e-maily z chatu; in-app notifikace zůstávají.
+  let quiet = false;
+  if (args.type.startsWith("chat_")) {
+    const presence = await ctx.db.query("presence").withIndex("by_user", (q) => q.eq("userId", args.userId)).unique();
+    quiet = isQuietNow(presence);
+  }
+  if (pref.email && user.email && !quiet) {
     const kill = await ctx.db.query("settings").withIndex("by_key", (q) => q.eq("key", "emailNotifications")).first();
     if (kill?.value !== "false") {
       await ctx.scheduler.runAfter(0, internal.email.send, {
