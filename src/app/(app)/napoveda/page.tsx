@@ -32,7 +32,7 @@ export default function HelpPage() {
           <li><b>Vlákna</b> — na zprávu se dá odpovědět stranou, ať se kanál nerozsype. Zaškrtnutím „Poslat i do kanálu“ se odpověď ukáže i v hlavním toku. Sledovaná vlákna máš v sekci Vlákna.</li>
           <li><b>Zmínky</b> — <b>@jméno</b> upozorní člověka, <b>@kanal</b> celý kanál (jen vlastník kanálu nebo admin). Všechny zmínky máš pohromadě v sekci Zmínky.</li>
           <li><b>Nepřečtené</b> — tučný kanál znamená nové zprávy, červené číslo počet zmínek. Počet vidíš i v titulku záložky. Filtrem v panelu si necháš jen nepřečtené, tlačítkem vedle označíš vše jako přečtené.</li>
-          <li><b>Upozornění</b> — v Mojich notifikacích si zapni upozornění prohlížeče; přijdou, i když máš appku na jiné záložce. Ikonou u svého jména nahoře nastavíš stav („Na akci“), <b>Nerušit</b> a tiché hodiny — v nich nechodí e-maily ani upozornění.</li>
+          <li><b>Upozornění a dostupnost</b> — jak zapnout upozornění prohlížeče a nastavit stav najdeš v sekci níž.</li>
           <li><b>Hledání</b> — hledá se bez ohledu na diakritiku, filtry se dají psát rovnou do dotazu: <code>faktura v:#eventy od:@monika</code>.</li>
           <li><b>Práce se zprávou</b> — reakce, připnutí pro celý kanál, uložení jen pro sebe, připomínka na později, přeposlání jinam, citace do odpovědi a <b>založení subúkolu</b> rovnou z textu zprávy. Na mobilu menu otevřeš dlouhým stiskem.</li>
           <li><b>Přílohy, GIFy a ankety</b> — soubory přetáhni do okna (max 20 MB, fotky se zmenší), GIF vybereš z Giphy (ukládá se jen odkaz), anketa má jednu nebo víc možností a je vidět, kdo hlasoval.</li>
@@ -40,6 +40,33 @@ export default function HelpPage() {
           <li><b>Kanál projektu nebo akce</b> — v detailu projektu / akce ho založíš jedním tlačítkem. Pak do něj chodí zprávy o změně stavu a o hotových nebo zablokovaných subúkolech.</li>
           <li><b>Souhrn e-mailem</b> — každý všední den odpoledne přijde přehled nepřečtených zmínek, přímých zpráv a vláken. Jde vypnout v Mojich notifikacích.</li>
         </ul>
+      </section>
+      <section className="card p-5 space-y-3">
+        <div className="text-base text-a-text font-semibold">Upozornění a dostupnost</div>
+
+        <div className="space-y-1">
+          <div className="font-medium text-a-text">Zapnout upozornění v prohlížeči</div>
+          <p>Bez nich se o nové zprávě dozvíš jen v otevřené appce. Zapnout je musí každý sám na svém počítači, appka se sama neptá.</p>
+          <ol className="list-decimal pl-5 space-y-1">
+            <li>Otevři <b>Moje notifikace</b> (v levém menu) nebo sjeď dolů v panelu chatu.</li>
+            <li>Klikni na <b>Zapnout upozornění v prohlížeči</b>.</li>
+            <li>Prohlížeč se zeptá — dej <b>Povolit</b>. Když jsi omylem dal Blokovat, povolí se to zpátky v nastavení webu (ikona zámku vedle adresy).</li>
+          </ol>
+          <p>Upozornění pak chodí na <b>zmínky, přímé zprávy a odpovědi ve vláknech</b>, a to i když máš appku na jiné záložce. Kliknutím se otevře rovnou daná zpráva. Zapnutí platí pro jeden prohlížeč a jedno zařízení — na notebooku i mobilu ho musíš zapnout zvlášť.</p>
+          <p>Nezávisle na tom počet nepřečtených vidíš <b>v titulku záložky a v její ikoně</b>, takže stačí kouknout na lištu prohlížeče.</p>
+        </div>
+
+        <div className="space-y-1">
+          <div className="font-medium text-a-text">Můj stav, Nerušit a tiché hodiny</div>
+          <p>Nahoře vedle zvonečku je ikona tvého stavu (smajlík, tvoje emoji, nebo přeškrtnutý zvoneček při Nerušit). Po kliknutí nastavíš:</p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li><b>Stav</b> — hotové volby (Na akci, Na cestě, Oběd, Home office, Dovolená) nebo vlastní text. Emoji se ukáže vedle tvého jména u zpráv a v profilu, kolegové tak vidí, že jsi třeba u klienta. Hotové volby samy vyprší (třeba oběd za hodinu), vlastní stav zrušíš tlačítkem <b>Zrušit stav</b>.</li>
+            <li><b>Nerušit</b> — na 30 minut, hodinu, tři hodiny nebo do zítřka.</li>
+            <li><b>Tiché hodiny</b> — pravidelné okno (třeba 18:00–08:00), kdy chceš mít klid každý den.</li>
+          </ul>
+          <p>V režimu Nerušit a v tichých hodinách <b>nechodí e-maily z chatu ani upozornění prohlížeče</b>. V appce se nic neztratí — nepřečtené, zmínky i zvoneček fungují dál, jen tě nic nevyruší.</p>
+          <p>Co komu chodí e-mailem a co jen do appky, si každý nastaví v <b>Mojich notifikacích</b>. Tam se vypíná i denní souhrn nepřečtených.</p>
+        </div>
       </section>
       <section className="card p-5 space-y-2">
         <div className="text-base text-a-text font-semibold">Pravidla, která nástroj hlídá</div>
