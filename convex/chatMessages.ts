@@ -9,6 +9,8 @@ import type { MutationCtx } from "./_generated/server";
 import { requireUser, type Ctx } from "./auth";
 import { canReadChannel, getMembership, requireChannelRead, requireChannelWrite } from "./chatAccess";
 import { notify } from "./notifications";
+import { isGiphyUrl } from "./giphy";
+import { chatGifValidator } from "./schema";
 import { deleteRemindersBy } from "./chatSchedule";
 
 const MAX_LEN = 4000;
@@ -270,6 +272,7 @@ export type DeliverArgs = {
   alsoInChannel?: boolean;
   attachments?: { storageId: Id<"_storage">; name: string }[];
   poll?: Doc<"chatMessages">["poll"];
+  gif?: Doc<"chatMessages">["gif"];
 };
 
 /**
@@ -284,7 +287,11 @@ export async function deliverMessage(
   membership: Doc<"chatMembers">,
   args: DeliverArgs,
 ) {
-    const text = cleanText(args.text, !!args.attachments?.length || !!args.poll);
+    const text = cleanText(args.text, !!args.attachments?.length || !!args.poll || !!args.gif);
+    // GIF je jen odkaz na CDN Giphy — cizí URL do zpráv nepustíme.
+    if (args.gif && !(isGiphyUrl(args.gif.url) && isGiphyUrl(args.gif.previewUrl))) {
+      throw new ConvexError("Neplatný odkaz na GIF.");
+    }
 
     let root: Doc<"chatMessages"> | null = null;
     if (args.parentId) {
@@ -314,6 +321,7 @@ export async function deliverMessage(
       reactions: [],
       attachments,
       poll: args.poll,
+      gif: args.gif,
       replyCount: 0,
       replyUserIds: [],
       createdAt: now,
@@ -331,7 +339,7 @@ export async function deliverMessage(
     const where = await channelLabel(ctx, channel);
     const body = args.poll
       ? `📊 Anketa: ${args.poll.question}`
-      : (await plainSnippet(ctx, text)) || `📎 ${attachments.map((a) => a.name).join(", ")}`;
+      : (await plainSnippet(ctx, text)) || (args.gif ? `🎞️ GIF: ${args.gif.title}` : `📎 ${attachments.map((a) => a.name).join(", ")}`);
     const link = root ? `/chat/${channel._id}?vlakno=${root._id}` : `/chat/${channel._id}?zprava=${messageId}`;
     const notified = new Set<string>();
 
@@ -409,6 +417,7 @@ export const send = mutation({
     parentId: v.optional(v.id("chatMessages")),
     alsoInChannel: v.optional(v.boolean()),
     attachments: v.optional(v.array(v.object({ storageId: v.id("_storage"), name: v.string() }))),
+    gif: v.optional(chatGifValidator),
   },
   handler: async (ctx, args) => {
     const { me, channel, membership } = await requireChannelWrite(ctx, args.channelId);
@@ -424,7 +433,7 @@ export const edit = mutation({
     if (msg.poll) throw new ConvexError("Anketu upravit nejde — uzavři ji a založ novou.");
     const { me, channel } = await requireChannelWrite(ctx, msg.channelId);
     if (msg.authorId !== me._id) throw new ConvexError("Upravit můžeš jen vlastní zprávu.");
-    const text = cleanText(args.text, msg.attachments.length > 0);
+    const text = cleanText(args.text, msg.attachments.length > 0 || !!msg.gif);
     const members = await ctx.db.query("chatMembers").withIndex("by_channel", (q) => q.eq("channelId", channel._id)).collect();
     const mentions = parseMentions(ctx, text, new Set(members.map((m) => m.userId)), me._id);
     const now = Date.now();
@@ -460,7 +469,7 @@ export const remove = mutation({
     // Root s odpověďmi zůstává jako „Zpráva byla smazána“, jinak by vlákno osiřelo.
     if (!msg.parentId && msg.replyCount > 0) {
       await ctx.db.patch(msg._id, {
-        text: "", attachments: [], reactions: [], mentions: [], pinnedAt: undefined, pinnedBy: undefined, poll: undefined, deletedAt: Date.now(),
+        text: "", attachments: [], reactions: [], mentions: [], pinnedAt: undefined, pinnedBy: undefined, poll: undefined, gif: undefined, deletedAt: Date.now(),
       });
       return;
     }

@@ -148,6 +148,19 @@ export const chatAttachmentValidator = v.object({
   size: v.number(),
 });
 
+/**
+ * GIF z Giphy. Ukládáme **jen odkaz** — obrázek zůstává na CDN Giphy, takže
+ * nezabírá naše úložiště ani kvótu. Host se validuje na serveru.
+ */
+export const chatGifValidator = v.object({
+  id: v.string(),
+  url: v.string(), // plná verze (media*.giphy.com)
+  previewUrl: v.string(),
+  width: v.number(),
+  height: v.number(),
+  title: v.string(),
+});
+
 /** Anketa je zpráva s polem `poll`; `text` drží otázku, aby šla najít fulltextem. */
 export const chatPollValidator = v.object({
   question: v.string(),
@@ -432,6 +445,7 @@ export default defineSchema({
     pinnedAt: v.optional(v.number()),
     pinnedBy: v.optional(v.id("users")),
     poll: v.optional(chatPollValidator),
+    gif: v.optional(chatGifValidator),
     createdAt: v.number(),
   })
     .index("by_channel_feed", ["channelId", "inChannel"])
@@ -486,6 +500,7 @@ export default defineSchema({
     alsoInChannel: v.optional(v.boolean()),
     text: v.string(),
     attachments: v.array(v.object({ storageId: v.id("_storage"), name: v.string() })),
+    gif: v.optional(chatGifValidator),
     sendAt: v.number(),
     jobId: v.optional(v.id("_scheduled_functions")), // doplní se hned po insertu
     createdAt: v.number(),

@@ -6,6 +6,7 @@ import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../convex/_generated/api";
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
 import { useMe } from "@/components/layout/AuthGuard";
+import { LightboxProvider } from "./Lightbox";
 
 export type SidebarChannel = FunctionReturnType<typeof api.chat.mySidebar>["channels"][number];
 export type ChannelDetail = NonNullable<FunctionReturnType<typeof api.chat.get>>;
@@ -87,5 +88,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     };
   }, [me, users, sidebar, saved, presence, emoji, reminders, scheduled, now]);
 
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+  return (
+    <Ctx.Provider value={value}>
+      <LightboxProvider>{children}</LightboxProvider>
+    </Ctx.Provider>
+  );
 }

@@ -9,6 +9,7 @@ import { formatDateTime } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 import { displayName, useChat, type ChannelDetail } from "./ChatContext";
 import { MessageItem } from "./MessageItem";
+import { useLightbox } from "./Lightbox";
 
 function PanelShell({ title, subtitle, onClose, children }: { title: string; subtitle: string; onClose: () => void; children: React.ReactNode }) {
   return (
@@ -67,8 +68,11 @@ export function FilesPanel({ channel, title, onClose, onJump }: {
 }) {
   const files = useQuery(api.chatExtras.files, { channelId: channel._id });
   const { userMap } = useChat();
+  const lightbox = useLightbox();
   const [tab, setTab] = useState<"all" | "images">("all");
   const shown = (files ?? []).filter((f) => tab === "all" || f.isImage);
+  const images = shown.filter((f) => f.isImage && f.url).map((f) => ({ url: f.url!, name: f.name, downloadUrl: f.downloadUrl, size: f.size }));
+  const openImage = (url: string) => lightbox.open(images, images.findIndex((x) => x.url === url));
 
   return (
     <PanelShell title="Soubory" subtitle={channel.kind === "channel" ? `#${channel.name}` : title} onClose={onClose}>
@@ -90,10 +94,14 @@ export function FilesPanel({ channel, title, onClose, onJump }: {
       ) : tab === "images" ? (
         <div className="grid grid-cols-3 gap-1 p-2">
           {shown.map((f) => f.url && (
-            <a key={`${f.messageId}-${f.storageId}`} href={f.url} target="_blank" rel="noopener noreferrer" title={f.name} className="block aspect-square overflow-hidden rounded-md bg-a-elevated">
+            <button
+              key={`${f.messageId}-${f.storageId}`} type="button" title={`${f.name} — otevřít náhled`}
+              onClick={() => openImage(f.url!)}
+              className="block aspect-square overflow-hidden rounded-md bg-a-elevated cursor-zoom-in"
+            >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={f.url} alt={f.name} className="h-full w-full object-cover" />
-            </a>
+            </button>
           ))}
         </div>
       ) : (
@@ -101,8 +109,10 @@ export function FilesPanel({ channel, title, onClose, onJump }: {
           {shown.map((f) => (
             <div key={`${f.messageId}-${f.storageId}`} className="group flex items-center gap-3 px-4 py-2 hover:bg-a-hover">
               {f.isImage && f.url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={f.url} alt="" className="h-9 w-9 shrink-0 rounded-md object-cover" />
+                <button type="button" onClick={() => openImage(f.url!)} title="Otevřít náhled" className="shrink-0 cursor-zoom-in">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={f.url} alt="" className="h-9 w-9 rounded-md object-cover" />
+                </button>
               ) : (
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-a-accent-bg text-a-accent-text"><FileText className="h-4 w-4" /></span>
               )}

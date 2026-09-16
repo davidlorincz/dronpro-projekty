@@ -19,6 +19,7 @@ import { EmojiPicker } from "./EmojiPicker";
 import { InlineText, MessageText } from "./MessageText";
 import { LinkPreviews } from "./LinkPreviews";
 import { EmojiGlyph } from "./EmojiGlyph";
+import { useLightbox } from "./Lightbox";
 import { PollCard } from "./Poll";
 import { WhenDialog } from "./WhenDialog";
 import { REMINDER_PRESETS, formatWhen } from "./when";
@@ -52,6 +53,7 @@ export function MessageItem({
   const edit = useMutation(api.chatMessages.edit);
   const remove = useMutation(api.chatMessages.remove);
   const markUnread = useMutation(api.chat.markUnread);
+  const lightbox = useLightbox();
   const togglePin = useMutation(api.chatExtras.togglePin);
   const toggleSaved = useMutation(api.chatExtras.toggleSaved);
   const setReminder = useMutation(api.chatSchedule.setReminder);
@@ -74,6 +76,11 @@ export function MessageItem({
       toast(now ? "Uloženo — najdeš ji v Uložených" : "Odebráno z uložených", "success");
     } catch (e) { errorToast(e); }
   };
+
+  // Všechny obrázky zprávy — v náhledu se mezi nimi listuje šipkami.
+  const images = m.attachments
+    .filter((a) => a.isImage && a.url)
+    .map((a) => ({ url: a.url!, name: a.name, downloadUrl: a.downloadUrl, size: a.size }));
 
   const react = async (emoji: string) => {
     try { await toggleReaction({ messageId: m._id, emoji }); } catch (e) { errorToast(e); }
@@ -194,14 +201,32 @@ export function MessageItem({
           </>
         )}
 
+        {!deleted && m.gif && (
+          <div className="mt-1.5">
+            <button
+              type="button" title={`${m.gif.title} — otevřít náhled`}
+              onClick={() => lightbox.open([{ url: m.gif!.url, name: m.gif!.title, downloadUrl: m.gif!.url }], 0)}
+              className="block max-w-[min(360px,100%)] overflow-hidden rounded-lg border border-a-border cursor-zoom-in"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={m.gif.url} alt={m.gif.title} className="block max-h-60 w-auto max-w-full" />
+            </button>
+            <div className="mt-0.5 text-[10px] text-a-text-4">GIF z GIPHY</div>
+          </div>
+        )}
+
         {!deleted && m.attachments.length > 0 && (
           <div className="mt-1.5 flex flex-wrap items-start gap-2">
             {m.attachments.map((a) =>
               a.isImage && a.url ? (
-                <a key={a.storageId} href={a.url} target="_blank" rel="noopener noreferrer" className="block max-w-[min(360px,100%)] overflow-hidden rounded-lg border border-a-border" title={a.name}>
+                <button
+                  key={a.storageId} type="button" title={`${a.name} — otevřít náhled`}
+                  onClick={() => lightbox.open(images, images.findIndex((x) => x.url === a.url))}
+                  className="block max-w-[min(360px,100%)] overflow-hidden rounded-lg border border-a-border cursor-zoom-in"
+                >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={a.url} alt={a.name} className="block max-h-60 w-auto max-w-full" />
-                </a>
+                </button>
               ) : (
                 <a key={a.storageId} href={a.downloadUrl} className="flex max-w-[280px] items-center gap-2.5 rounded-lg border border-a-border bg-a-surface px-3 py-2 hover:bg-a-hover" title={`Stáhnout ${a.name}`}>
                   <FileText className="h-6 w-6 shrink-0 text-a-accent-text" />

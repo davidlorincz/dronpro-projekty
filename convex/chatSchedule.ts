@@ -9,6 +9,7 @@ import { requireUser } from "./auth";
 import { canReadChannel, getMembership, requireChannelRead, requireChannelWrite } from "./chatAccess";
 import { channelLabel, deliverMessage, plainSnippet } from "./chatMessages";
 import { notify } from "./notifications";
+import { chatGifValidator } from "./schema";
 
 const MIN_AHEAD_MS = 60_000;
 const MAX_AHEAD_MS = 366 * 86_400_000;
@@ -145,13 +146,14 @@ export const schedule = mutation({
     parentId: v.optional(v.id("chatMessages")),
     alsoInChannel: v.optional(v.boolean()),
     attachments: v.optional(v.array(v.object({ storageId: v.id("_storage"), name: v.string() }))),
+    gif: v.optional(chatGifValidator),
     sendAt: v.number(),
   },
   handler: async (ctx, args) => {
     const { me } = await requireChannelWrite(ctx, args.channelId);
     checkTime(args.sendAt);
     const text = args.text.trim();
-    if (!text && !args.attachments?.length) throw new ConvexError("Zpráva je prázdná.");
+    if (!text && !args.attachments?.length && !args.gif) throw new ConvexError("Zpráva je prázdná.");
     if (text.length > MAX_LEN) throw new ConvexError(`Zpráva je delší než ${MAX_LEN} znaků.`);
     const id = await ctx.db.insert("chatScheduled", {
       userId: me._id,
@@ -160,6 +162,7 @@ export const schedule = mutation({
       alsoInChannel: args.alsoInChannel,
       text,
       attachments: args.attachments ?? [],
+      gif: args.gif,
       sendAt: args.sendAt,
       createdAt: Date.now(),
     });
@@ -263,6 +266,7 @@ export const myScheduled = query({
         parentId: r.parentId,
         text: r.text,
         attachmentCount: r.attachments.length,
+        gif: r.gif,
         sendAt: r.sendAt,
       });
     }

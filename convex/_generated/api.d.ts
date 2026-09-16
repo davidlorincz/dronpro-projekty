@@ -31,6 +31,7 @@ import type * as eventFiles from "../eventFiles.js";
 import type * as events from "../events.js";
 import type * as exportData from "../exportData.js";
 import type * as gantt from "../gantt.js";
+import type * as giphy from "../giphy.js";
 import type * as http from "../http.js";
 import type * as ics from "../ics.js";
 import type * as invites from "../invites.js";
@@ -76,6 +77,7 @@ declare const fullApi: ApiFromModules<{
   events: typeof events;
   exportData: typeof exportData;
   gantt: typeof gantt;
+  giphy: typeof giphy;
   http: typeof http;
   ics: typeof ics;
   invites: typeof invites;

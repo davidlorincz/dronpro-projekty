@@ -6,7 +6,7 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { useRouter } from "next/navigation";
 import * as Popover from "@radix-ui/react-popover";
-import { AtSign, BarChart3, ChevronDown, Clock, FileText, Hash, Loader2, Megaphone, Paperclip, Send, Smile, X } from "lucide-react";
+import { AtSign, BarChart3, ChevronDown, Clock, FileText, Film, Hash, Loader2, Megaphone, Paperclip, Send, Smile, X } from "lucide-react";
 import { UserAvatar } from "@/components/shared/UserAvatar";
 import { errorToast } from "@/lib/convexError";
 import { downscaleImage, formatBytes, postFile } from "@/lib/upload";
@@ -16,6 +16,7 @@ import { EmojiPicker } from "./EmojiPicker";
 import { searchShortcodes } from "./emoji";
 import { EmojiGlyph } from "./EmojiGlyph";
 import { PollDialog } from "./Poll";
+import { GifPicker, type Gif } from "./GifPicker";
 import { WhenDialog } from "./WhenDialog";
 import { SCHEDULE_PRESETS, formatWhen } from "./when";
 import { toast } from "@/lib/toast";
@@ -58,6 +59,7 @@ export function Composer({
   const router = useRouter();
   const scheduleSend = useMutation(api.chatSchedule.schedule);
   const [pollOpen, setPollOpen] = useState(false);
+  const [gif, setGif] = useState<Gif | null>(null);
   const [scheduleMenu, setScheduleMenu] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const send = useMutation(api.chatMessages.send);
@@ -210,13 +212,14 @@ export function Composer({
   // ---- odeslání -------------------------------------------------------------
 
   const uploading = pending.some((p) => !p.storageId);
-  const canSend = !sending && !uploading && (text.trim().length > 0 || pending.length > 0);
+  const canSend = !sending && !uploading && (text.trim().length > 0 || pending.length > 0 || !!gif);
 
   const resetAfterSend = () => {
     setText("");
     writeDraft(draftKey, "");
     setPicked(new Map());
     setPending([]);
+    setGif(null);
     setAlsoInChannel(false);
   };
 
@@ -224,7 +227,7 @@ export function Composer({
     const body = encodeMessage(text, picked, channelIdByName);
     const attachments = pending.filter((p) => p.storageId).map((p) => ({ storageId: p.storageId!, name: p.name }));
     try {
-      await scheduleSend({ channelId, text: body, parentId, alsoInChannel: parentId ? alsoInChannel : undefined, attachments, sendAt });
+      await scheduleSend({ channelId, text: body, parentId, alsoInChannel: parentId ? alsoInChannel : undefined, attachments, gif: gif ?? undefined, sendAt });
       resetAfterSend();
       if (typingSentAt.current) { typingSentAt.current = 0; void setTyping({ channelId, parentId, typing: false }).catch(() => {}); }
       toast(`Zpráva se odešle ${formatWhen(sendAt)}`, "success", undefined, { label: "Naplánované", onClick: () => router.push("/chat/naplanovane") });
@@ -239,7 +242,7 @@ export function Composer({
     const attachments = pending.filter((p) => p.storageId).map((p) => ({ storageId: p.storageId!, name: p.name }));
     setSending(true);
     try {
-      await send({ channelId, text: body, parentId, alsoInChannel: parentId ? alsoInChannel : undefined, attachments });
+      await send({ channelId, text: body, parentId, alsoInChannel: parentId ? alsoInChannel : undefined, attachments, gif: gif ?? undefined });
       resetAfterSend();
       typingSentAt.current = 0; // řádek „píše…“ smazal už `send` na serveru
     } catch (e) {
@@ -287,6 +290,20 @@ export function Composer({
       )}
 
       <div className="rounded-xl border border-a-border bg-a-input focus-within:border-cyan-500 transition-colors">
+        {gif && (
+          <div className="px-3 pt-2.5">
+            <div className="relative inline-block overflow-hidden rounded-lg border border-a-border">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={gif.previewUrl} alt={gif.title} className="block max-h-28 w-auto" />
+              <button
+                type="button" onClick={() => setGif(null)} title="Odebrat GIF"
+                className="absolute right-1 top-1 rounded-full bg-black/60 p-1 text-white hover:bg-black/80 cursor-pointer"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
         {pending.length > 0 && (
           <div className="flex flex-wrap gap-2 px-3 pt-2.5">
             {pending.map((p) => (
@@ -326,6 +343,11 @@ export function Composer({
               <Smile className="h-4 w-4" />
             </button>
           </EmojiPicker>
+          <GifPicker onSelect={setGif}>
+            <button type="button" className="rounded-lg p-1.5 text-a-text-3 hover:bg-a-hover hover:text-a-text cursor-pointer" title="GIF z Giphy">
+              <Film className="h-4 w-4" />
+            </button>
+          </GifPicker>
           <button type="button" onClick={() => setPollOpen(true)} className="rounded-lg p-1.5 text-a-text-3 hover:bg-a-hover hover:text-a-text cursor-pointer" title="Anketa">
             <BarChart3 className="h-4 w-4" />
           </button>

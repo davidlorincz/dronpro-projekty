@@ -353,6 +353,10 @@ export function ScheduledView() {
               </Link>
             </div>
             <div className="text-sm text-a-text-2"><Snippet text={m.text} attachments={m.attachmentCount} /></div>
+            {m.gif && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={m.gif.previewUrl} alt={m.gif.title} className="mt-1.5 block max-h-24 w-auto rounded-lg border border-a-border" />
+            )}
             {m.attachmentCount > 0 && m.text && <div className="mt-1 text-xs text-a-text-4"><Paperclip className="-mt-0.5 inline h-3 w-3" /> {m.attachmentCount} příloh</div>}
             <div className="mt-3 flex flex-wrap gap-2">
               <button type="button"
