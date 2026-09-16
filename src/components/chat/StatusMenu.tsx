@@ -47,7 +47,7 @@ export function StatusMenu() {
   return (
     <Popover.Root open={open} onOpenChange={(v) => { setOpen(v); if (v) setText(presence?.statusText ?? ""); }}>
       <Popover.Trigger asChild>
-        <button type="button" title="Můj stav a Nerušit" className="rounded-lg p-2 text-a-text-3 hover:bg-a-hover hover:text-a-text cursor-pointer">
+        <button type="button" title="Můj stav a Nerušit" aria-label="Můj stav a Nerušit" className="rounded-lg p-2 text-a-text-3 hover:bg-a-hover hover:text-a-text cursor-pointer">
           {dndActive ? <BellOff className="h-5 w-5 text-amber-500" /> : presence?.statusEmoji ? <span className="text-base leading-5">{presence.statusEmoji}</span> : <Smile className="h-5 w-5" />}
         </button>
       </Popover.Trigger>

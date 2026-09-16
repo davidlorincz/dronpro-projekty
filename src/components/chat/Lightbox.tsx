@@ -58,13 +58,13 @@ export function LightboxProvider({ children }: { children: ReactNode }) {
               </div>
             </div>
             <div className="ml-auto flex items-center gap-1">
-              <a href={current.downloadUrl} title="Stáhnout" className="rounded-lg p-2 text-white/80 hover:bg-white/10 hover:text-white">
+              <a href={current.downloadUrl} title="Stáhnout" aria-label="Stáhnout" className="rounded-lg p-2 text-white/80 hover:bg-white/10 hover:text-white">
                 <Download className="h-5 w-5" />
               </a>
-              <a href={current.url} target="_blank" rel="noopener noreferrer" title="Otevřít v novém panelu" className="rounded-lg p-2 text-white/80 hover:bg-white/10 hover:text-white">
+              <a href={current.url} target="_blank" rel="noopener noreferrer" title="Otevřít v novém panelu" aria-label="Otevřít v novém panelu" className="rounded-lg p-2 text-white/80 hover:bg-white/10 hover:text-white">
                 <ExternalLink className="h-5 w-5" />
               </a>
-              <button type="button" onClick={close} title="Zavřít (Esc)" className="rounded-lg p-2 text-white/80 hover:bg-white/10 hover:text-white cursor-pointer">
+              <button type="button" onClick={close} title="Zavřít (Esc)" aria-label="Zavřít (Esc)" className="rounded-lg p-2 text-white/80 hover:bg-white/10 hover:text-white cursor-pointer">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -73,7 +73,7 @@ export function LightboxProvider({ children }: { children: ReactNode }) {
           <div className="relative flex min-h-0 flex-1 items-center justify-center px-4 pb-6">
             {images.length > 1 && (
               <button
-                type="button" title="Předchozí (←)"
+                type="button" title="Předchozí (←)" aria-label="Předchozí (←)"
                 onClick={(e) => { e.stopPropagation(); step(-1); }}
                 className="absolute left-2 rounded-full bg-black/40 p-2 text-white/80 hover:bg-black/60 hover:text-white cursor-pointer"
               >
@@ -88,7 +88,7 @@ export function LightboxProvider({ children }: { children: ReactNode }) {
             />
             {images.length > 1 && (
               <button
-                type="button" title="Další (→)"
+                type="button" title="Další (→)" aria-label="Další (→)"
                 onClick={(e) => { e.stopPropagation(); step(1); }}
                 className="absolute right-2 rounded-full bg-black/40 p-2 text-white/80 hover:bg-black/60 hover:text-white cursor-pointer"
               >

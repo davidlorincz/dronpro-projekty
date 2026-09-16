@@ -14,6 +14,7 @@ import { chatGifValidator } from "./schema";
 import { foldText } from "./lib";
 import { internal } from "./_generated/api";
 import { deleteRemindersBy } from "./chatSchedule";
+import { deleteActivityFor, logActivity } from "./chatActivity";
 
 const MAX_LEN = 4000;
 const MAX_ATTACHMENTS = 10;
@@ -145,6 +146,7 @@ async function deleteMentionRows(ctx: MutationCtx, messageId: Id<"chatMessages">
     await ctx.db.delete(r._id);
   }
   await deleteRemindersBy(ctx, await ctx.db.query("chatReminders").withIndex("by_message", (q) => q.eq("messageId", messageId)).collect());
+  await deleteActivityFor(ctx, await ctx.db.query("chatActivity").withIndex("by_message", (q) => q.eq("messageId", messageId)).collect());
 }
 
 // ---- queries ---------------------------------------------------------------
@@ -396,6 +398,13 @@ export async function fanOutMessage(ctx: MutationCtx, messageId: Id<"chatMessage
       const isMention = !!msg.mentionsChannel || msg.mentions.includes(m.userId);
       if (channel.kind === "dm" || isMention) await ctx.db.patch(m._id, { mentionCount: m.mentionCount + 1 });
 
+      if (channel.kind === "dm" || isMention) {
+        await logActivity(ctx, {
+          userId: m.userId, kind: channel.kind === "dm" ? "dm" : "mention",
+          channelId: channel._id, actorId: me._id, messageId: msg._id,
+        });
+      }
+
       const level = m.notify ?? (channel.kind === "dm" ? "all" : "mentions");
       if (level === "none" || (m.muted && !isMention)) continue;
       notified.add(m.userId);
@@ -433,6 +442,7 @@ export async function fanOutMessage(ctx: MutationCtx, messageId: Id<"chatMessage
       await ctx.db.patch(f._id, { unread: true, lastReplyAt: msg.createdAt });
       // Notifikace jen při prvním nepřečteném — živé vlákno by jinak zasypalo zvoneček.
       if (!f.unread && !notified.has(f.userId) && memberIds.has(f.userId)) {
+        await logActivity(ctx, { userId: f.userId, kind: "reply", channelId: channel._id, actorId: me._id, messageId: msg._id });
         await notify(ctx, { userId: f.userId, type: "chat_thread_reply", title: `${who} odpověděl(a) ve vlákně v ${where}`, body, link });
       }
     }
@@ -572,9 +582,13 @@ export const toggleReaction = mutation({
       existing.userIds = existing.userIds.includes(me._id)
         ? existing.userIds.filter((id) => id !== me._id)
         : [...existing.userIds, me._id];
+      if (!existing.userIds.includes(me._id)) {
+        await logActivity(ctx, { userId: msg.authorId, kind: "reaction", channelId: msg.channelId, actorId: me._id, messageId: msg._id, emoji });
+      }
     } else {
       if (reactions.length >= MAX_REACTION_KINDS) throw new ConvexError("Na zprávě je už příliš mnoho různých reakcí.");
       reactions.push({ emoji, userIds: [me._id] });
+      await logActivity(ctx, { userId: msg.authorId, kind: "reaction", channelId: msg.channelId, actorId: me._id, messageId: msg._id, emoji });
     }
     await ctx.db.patch(msg._id, { reactions: reactions.filter((r) => r.userIds.length > 0) });
   },

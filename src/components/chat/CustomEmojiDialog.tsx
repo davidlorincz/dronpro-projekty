@@ -77,7 +77,7 @@ export function CustomEmojiDialog({ onClose }: { onClose: () => void }) {
             <button
               type="button" onClick={() => fileRef.current?.click()}
               className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-dashed border-a-border bg-a-elevated text-a-text-4 hover:border-cyan-500 cursor-pointer"
-              title="Vybrat obrázek"
+              title="Vybrat obrázek" aria-label="Vybrat obrázek"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               {preview ? <img src={preview} alt="" className="h-12 w-12 object-contain" /> : <ImagePlus className="h-6 w-6" />}
@@ -110,7 +110,7 @@ export function CustomEmojiDialog({ onClose }: { onClose: () => void }) {
                   {e.url && <img src={e.url} alt={e.name} className="h-6 w-6 object-contain" />}
                   <span className="min-w-0 flex-1 truncate text-xs text-a-text-2">:{e.name}:</span>
                   {(e.createdBy === me._id || isAdmin) && (
-                    <button type="button" title="Smazat emoji"
+                    <button type="button" title="Smazat emoji" aria-label="Smazat emoji"
                       onClick={async () => { try { await remove({ emojiId: e._id }); } catch (err) { errorToast(err); } }}
                       className="hidden rounded p-0.5 text-a-text-4 hover:text-red-600 group-hover:block cursor-pointer">
                       <Trash2 className="h-3.5 w-3.5" />

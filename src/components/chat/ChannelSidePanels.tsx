@@ -19,7 +19,7 @@ function PanelShell({ title, subtitle, onClose, children }: { title: string; sub
           <div className="font-semibold text-a-text">{title}</div>
           <div className="truncate text-xs text-a-text-4">{subtitle}</div>
         </div>
-        <button type="button" onClick={onClose} className="ml-auto rounded-lg p-1.5 text-a-text-3 hover:bg-a-hover hover:text-a-text cursor-pointer" title="Zavřít (Esc)">
+        <button type="button" onClick={onClose} className="ml-auto rounded-lg p-1.5 text-a-text-3 hover:bg-a-hover hover:text-a-text cursor-pointer" title="Zavřít (Esc)" aria-label="Zavřít (Esc)">
           <X className="h-4 w-4" />
         </button>
       </div>
@@ -36,7 +36,7 @@ export function PinnedPanel({ channel, title, onClose, onJump }: {
   const canWrite = !!channel.membership && !channel.archivedAt;
 
   return (
-    <PanelShell title="Připnuté zprávy" subtitle={channel.kind === "channel" ? `#${channel.name}` : title} onClose={onClose}>
+    <PanelShell title="Připnuté zprávy" aria-label="Připnuté zprávy" subtitle={channel.kind === "channel" ? `#${channel.name}` : title} onClose={onClose}>
       {pinned === undefined ? (
         <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-a-text-4" /></div>
       ) : pinned.length === 0 ? (
@@ -75,7 +75,7 @@ export function FilesPanel({ channel, title, onClose, onJump }: {
   const openImage = (url: string) => lightbox.open(images, images.findIndex((x) => x.url === url));
 
   return (
-    <PanelShell title="Soubory" subtitle={channel.kind === "channel" ? `#${channel.name}` : title} onClose={onClose}>
+    <PanelShell title="Soubory" aria-label="Soubory" subtitle={channel.kind === "channel" ? `#${channel.name}` : title} onClose={onClose}>
       <div className="flex gap-4 border-b border-a-border px-4">
         {(["all", "images"] as const).map((t) => (
           <button key={t} type="button" onClick={() => setTab(t)}
@@ -109,20 +109,20 @@ export function FilesPanel({ channel, title, onClose, onJump }: {
           {shown.map((f) => (
             <div key={`${f.messageId}-${f.storageId}`} className="group flex items-center gap-3 px-4 py-2 hover:bg-a-hover">
               {f.isImage && f.url ? (
-                <button type="button" onClick={() => openImage(f.url!)} title="Otevřít náhled" className="shrink-0 cursor-zoom-in">
+                <button type="button" onClick={() => openImage(f.url!)} title="Otevřít náhled" aria-label="Otevřít náhled" className="shrink-0 cursor-zoom-in">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={f.url} alt="" className="h-9 w-9 rounded-md object-cover" />
                 </button>
               ) : (
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-a-accent-bg text-a-accent-text"><FileText className="h-4 w-4" /></span>
               )}
-              <button type="button" onClick={() => onJump(f.messageId, f.parentId)} className="min-w-0 flex-1 text-left cursor-pointer" title="Zobrazit v konverzaci">
+              <button type="button" onClick={() => onJump(f.messageId, f.parentId)} className="min-w-0 flex-1 text-left cursor-pointer" title="Zobrazit v konverzaci" aria-label="Zobrazit v konverzaci">
                 <div className="truncate text-sm font-medium text-a-text">{f.name}</div>
                 <div className="truncate text-xs text-a-text-4">
                   {displayName(userMap.get(f.authorId))} · {formatDateTime(f.createdAt)} · {formatBytes(f.size)}
                 </div>
               </button>
-              <a href={f.downloadUrl} className="rounded-md p-1.5 text-a-text-4 hover:bg-a-elevated hover:text-a-text" title="Stáhnout">
+              <a href={f.downloadUrl} className="rounded-md p-1.5 text-a-text-4 hover:bg-a-elevated hover:text-a-text" title="Stáhnout" aria-label="Stáhnout">
                 <Download className="h-4 w-4" />
               </a>
             </div>

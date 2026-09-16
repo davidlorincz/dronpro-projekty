@@ -167,7 +167,7 @@ export function MessageItem({
         {!deleted && (m.pinnedAt || saved || reminder) && (
           <div className="flex items-center gap-3 text-[11px] font-medium">
             {reminder && (
-              <button type="button" title="Zrušit připomínku"
+              <button type="button" title="Zrušit připomínku" aria-label="Zrušit připomínku"
                 onClick={async () => { try { await cancelReminder({ reminderId: reminder._id }); toast("Připomínka zrušena", "success"); } catch (e) { errorToast(e); } }}
                 className="inline-flex items-center gap-1 text-violet-600 hover:line-through cursor-pointer">
                 <AlarmClock className="h-3 w-3" /> Připomenu {formatWhen(reminder.remindAt)}
@@ -308,7 +308,7 @@ export function MessageItem({
             })}
             {canWrite && (
               <EmojiPicker onSelect={(e) => void react(e)} side="top" align="start">
-                <button type="button" className="inline-flex h-6 items-center rounded-full border border-a-border bg-a-surface px-1.5 text-a-text-4 hover:text-a-text cursor-pointer" title="Přidat reakci">
+                <button type="button" className="inline-flex h-6 items-center rounded-full border border-a-border bg-a-surface px-1.5 text-a-text-4 hover:text-a-text cursor-pointer" title="Přidat reakci" aria-label="Přidat reakci">
                   <SmilePlus className="h-3.5 w-3.5" />
                 </button>
               </EmojiPicker>
@@ -338,11 +338,11 @@ export function MessageItem({
           ))}
           {canWrite && (
             <EmojiPicker onSelect={(e) => void react(e)} side="bottom" align="end" onOpenChange={setPickerOpen}>
-              <button type="button" className={toolBtn} title="Přidat reakci"><SmilePlus className="h-4 w-4" /></button>
+              <button type="button" className={toolBtn} title="Přidat reakci" aria-label="Přidat reakci"><SmilePlus className="h-4 w-4" /></button>
             </EmojiPicker>
           )}
           {canWrite && !inThread && !m.parentId && (
-            <button type="button" onClick={() => onOpenThread?.(m._id)} className={toolBtn} title="Odpovědět ve vlákně">
+            <button type="button" onClick={() => onOpenThread?.(m._id)} className={toolBtn} title="Odpovědět ve vlákně" aria-label="Odpovědět ve vlákně">
               <MessageSquareReply className="h-4 w-4" />
             </button>
           )}
@@ -351,10 +351,10 @@ export function MessageItem({
           </button>
           <Popover.Root open={menuOpen} onOpenChange={setMenuOpen}>
             <Popover.Trigger asChild>
-              <button type="button" className={toolBtn} title="Další akce"><MoreHorizontal className="h-4 w-4" /></button>
+              <button type="button" className={toolBtn} title="Další akce" aria-label="Další akce"><MoreHorizontal className="h-4 w-4" /></button>
             </Popover.Trigger>
             <Popover.Portal>
-              <Popover.Content side="bottom" align="end" sideOffset={4} collisionPadding={12} className="z-[60] w-56 rounded-xl border border-a-border bg-a-surface py-1 shadow-xl">
+              <Popover.Content side="bottom" align="end" sideOffset={4} collisionPadding={12} aria-label="Akce zprávy" className="z-[60] w-56 rounded-xl border border-a-border bg-a-surface py-1 shadow-xl">
                 {mine && canWrite && !m.poll && (
                   <MenuItem icon={Pencil} label="Upravit zprávu" onClick={() => { setMenuOpen(false); onStartEdit(); }} />
                 )}
@@ -399,7 +399,7 @@ export function MessageItem({
       {subtaskOpen && <SubtaskFromMessageDialog message={m} plainText={plainText} onClose={() => setSubtaskOpen(false)} />}
       {reminderOpen && (
         <WhenDialog
-          title="Připomenout zprávu"
+          title="Připomenout zprávu" aria-label="Připomenout zprávu"
           description="Pošlu ti upozornění se odkazem na tuhle zprávu."
           presets={REMINDER_PRESETS}
           confirmLabel="Nastavit připomínku"
@@ -411,7 +411,7 @@ export function MessageItem({
       )}
       <ConfirmDialog
         open={confirmDelete}
-        title="Smazat zprávu?"
+        title="Smazat zprávu?" aria-label="Smazat zprávu?"
         description={m.replyCount > 0 ? "Zpráva zmizí pro všechny. Vlákno s odpověďmi zůstane." : "Zpráva zmizí pro všechny i s přílohami."}
         onClose={() => setConfirmDelete(false)}
         onConfirm={async () => { try { await remove({ messageId: m._id }); } catch (e) { errorToast(e); } }}

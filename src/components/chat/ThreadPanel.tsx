@@ -59,7 +59,7 @@ export function ThreadPanel({ rootId, channel, title, onClose, typingRows }: {
             {data.following ? "Nesledovat" : "Sledovat"}
           </button>
         )}
-        <button type="button" onClick={onClose} className={`${data ? "" : "ml-auto "}rounded-lg p-1.5 text-a-text-3 hover:bg-a-hover hover:text-a-text cursor-pointer`} title="Zavřít (Esc)">
+        <button type="button" onClick={onClose} className={`${data ? "" : "ml-auto "}rounded-lg p-1.5 text-a-text-3 hover:bg-a-hover hover:text-a-text cursor-pointer`} title="Zavřít (Esc)" aria-label="Zavřít (Esc)">
           <X className="h-4 w-4" />
         </button>
       </div>

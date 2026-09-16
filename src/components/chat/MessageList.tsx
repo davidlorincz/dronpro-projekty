@@ -174,7 +174,11 @@ export function MessageList({
 
   return (
     <div className="relative min-h-0 flex-1">
-      <div ref={scrollRef} onScroll={onScroll} className="h-full overflow-y-auto overscroll-contain">
+      <div
+        ref={scrollRef} onScroll={onScroll}
+        role="log" aria-live="polite" aria-relevant="additions" aria-label="Zprávy v konverzaci"
+        className="h-full overflow-y-auto overscroll-contain"
+      >
         <div ref={contentRef} className="flex min-h-full flex-col justify-end pb-3">
           {status === "LoadingFirstPage" ? (
             <div className="flex flex-1 items-center justify-center text-sm text-a-text-4"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Načítám zprávy…</div>

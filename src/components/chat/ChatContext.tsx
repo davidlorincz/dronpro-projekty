@@ -20,6 +20,7 @@ type ChatCtx = {
   channelMap: Map<string, SidebarChannel>;
   userName: (id: Id<"users"> | string) => string;
   savedIds: Set<string>;
+  activityUnread: number;
   /** Vlastní emoji `name → url`. */
   emojiMap: Map<string, string>;
   customEmoji: { _id: Id<"chatEmoji">; name: string; url: string | null; createdBy: Id<"users"> }[];
@@ -60,6 +61,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const users = useQuery(api.users.list);
   const sidebar = useQuery(api.chat.mySidebar);
   const saved = useQuery(api.chatExtras.savedIds);
+  const activityUnread = useQuery(api.chatActivity.unreadCount);
   const presence = useQuery(api.presence.online);
   const emoji = useQuery(api.chatEmoji.list);
   const reminders = useQuery(api.chatSchedule.myReminders);
@@ -86,6 +88,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       channelMap,
       userName,
       savedIds: new Set((saved ?? []).map(String)),
+      activityUnread: activityUnread ?? 0,
       emojiMap: new Map((emoji ?? []).filter((e) => e.url).map((e) => [e.name, e.url!])),
       customEmoji: emoji ?? [],
       reminderByMessage: new Map((reminders ?? []).map((r) => [r.messageId as string, { _id: r._id, remindAt: r.remindAt }])),
@@ -109,7 +112,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         return c.dmUserIds.map(userName).join(", ");
       },
     };
-  }, [me, users, sidebar, saved, presence, emoji, reminders, scheduled, now]);
+  }, [me, users, sidebar, saved, presence, emoji, reminders, scheduled, activityUnread, now]);
 
   return (
     <Ctx.Provider value={value}>

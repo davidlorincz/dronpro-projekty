@@ -33,6 +33,10 @@ export default function HelpPage() {
           <li><b>Zmínky</b> — <b>@jméno</b> upozorní člověka, <b>@kanal</b> celý kanál (jen vlastník kanálu nebo admin). Všechny zmínky máš pohromadě v sekci Zmínky.</li>
           <li><b>Nepřečtené</b> — tučný kanál znamená nové zprávy, červené číslo počet zmínek. Počet vidíš i v titulku záložky. Filtrem v panelu si necháš jen nepřečtené, tlačítkem vedle označíš vše jako přečtené.</li>
           <li><b>Upozornění a dostupnost</b> — jak zapnout upozornění prohlížeče a nastavit stav najdeš v sekci níž.</li>
+          <li><b>Aktivita</b> — jeden seznam všeho, co se týká přímo tebe: zmínky, reakce na tvé zprávy, odpovědi ve vláknech a přidání do kanálu. Otevřením se označí za přečtené.</li>
+          <li><b>Příkazy</b> — napiš <code>/</code> a vyber ze seznamu: <code>/dnd 1h</code>, <code>/stav 🎥 Na akci</code>, <code>/anketa Otázka | volba | volba</code>, <code>/pozvat @jméno</code>, <code>/tema</code>, <code>/prejmenovat</code>, <code>/odejit</code>, <code>/gif</code>, <code>/hledat</code>, <code>/zkratky</code>.</li>
+          <li><b>Sekce v panelu</b> — u každé konverzace je přes <code>⋯</code> volba Přesunout do sekce; vlastní sekce („Klienti“, „Provoz“) si pojmenuješ sám a platí jen tobě. Ve stejném menu je i oblíbené a ztlumení.</li>
+          <li><b>Odkazy</b> — u odkazu na web se ukáže karta s titulkem a obrázkem, u odkazu na projekt nebo akci karta se stavem a termínem.</li>
           <li><b>Hledání</b> — hledá se bez ohledu na diakritiku, filtry se dají psát rovnou do dotazu: <code>faktura v:#eventy od:@monika</code>.</li>
           <li><b>Práce se zprávou</b> — reakce, připnutí pro celý kanál, uložení jen pro sebe, připomínka na později, přeposlání jinam, citace do odpovědi a <b>založení subúkolu</b> rovnou z textu zprávy. Na mobilu menu otevřeš dlouhým stiskem.</li>
           <li><b>Přílohy, GIFy a ankety</b> — soubory přetáhni do okna (max 20 MB, fotky se zmenší), GIF vybereš z Giphy (ukládá se jen odkaz), anketa má jednu nebo víc možností a je vidět, kdo hlasoval.</li>

@@ -52,7 +52,7 @@ export function PollDialog({ channelId, parentId, onClose }: {
                   className={inputCls}
                 />
                 {options.length > 2 && (
-                  <button type="button" onClick={() => setOptions((x) => x.filter((_, j) => j !== i))} className="rounded p-1 text-a-text-4 hover:text-a-text cursor-pointer" title="Odebrat možnost">
+                  <button type="button" onClick={() => setOptions((x) => x.filter((_, j) => j !== i))} className="rounded p-1 text-a-text-4 hover:text-a-text cursor-pointer" title="Odebrat možnost" aria-label="Odebrat možnost">
                     <X className="h-4 w-4" />
                   </button>
                 )}

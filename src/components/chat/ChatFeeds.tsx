@@ -6,7 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { AlarmClock, AlarmClockOff, ArrowLeft, AtSign, Bookmark, BookmarkX, Clock, Hash, Loader2, MessagesSquare, Paperclip, Search, Send, Trash2, X } from "lucide-react";
+import { AlarmClock, AlarmClockOff, ArrowLeft, AtSign, Bell, Bookmark, BookmarkX, Clock, Hash, Loader2, MessageSquareReply, MessagesSquare, Paperclip, Search, Send, SmilePlus, Trash2, UserPlus, X } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { toast } from "@/lib/toast";
 import { WhenDialog } from "./WhenDialog";
@@ -23,7 +23,7 @@ function FeedShell({ icon: Icon, title, children }: { icon: typeof Hash; title: 
   return (
     <div className="flex h-full min-w-0 flex-1 flex-col bg-a-surface">
       <div className="flex h-14 shrink-0 items-center gap-2 border-b border-a-border px-3 md:px-4">
-        <Link href="/chat" className="rounded-lg p-1.5 text-a-text-3 hover:bg-a-hover md:hidden" title="Zpět"><ArrowLeft className="h-4 w-4" /></Link>
+        <Link href="/chat" className="rounded-lg p-1.5 text-a-text-3 hover:bg-a-hover md:hidden" title="Zpět" aria-label="Zpět"><ArrowLeft className="h-4 w-4" /></Link>
         <Icon className="h-4 w-4 text-a-text-3" />
         <div className="font-semibold text-a-text">{title}</div>
       </div>
@@ -44,7 +44,7 @@ export function ThreadsView() {
   const { userMap, channelTitle, channelMap } = useChat();
 
   return (
-    <FeedShell icon={MessagesSquare} title="Vlákna">
+    <FeedShell icon={MessagesSquare} title="Vlákna" aria-label="Vlákna">
       {threads === undefined ? (
         <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-a-text-4" /></div>
       ) : threads.length === 0 ? (
@@ -138,7 +138,7 @@ export function MentionsView() {
   const mentions = useQuery(api.chatMessages.myMentions);
 
   return (
-    <FeedShell icon={AtSign} title="Zmínky">
+    <FeedShell icon={AtSign} title="Zmínky" aria-label="Zmínky">
       {mentions === undefined ? (
         <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-a-text-4" /></div>
       ) : mentions.length === 0 ? (
@@ -157,7 +157,7 @@ export function SavedView() {
   const cancelReminder = useMutation(api.chatSchedule.cancelReminder);
 
   return (
-    <FeedShell icon={Bookmark} title="Uložené">
+    <FeedShell icon={Bookmark} title="Uložené" aria-label="Uložené">
       {reminders && reminders.length > 0 && (
         <>
           <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-a-text-4"><AlarmClock className="h-3.5 w-3.5" /> Připomínky</div>
@@ -168,7 +168,7 @@ export function SavedView() {
                 <span className="flex items-center gap-1">
                   <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-medium text-violet-700">{formatWhen(r.remindAt)}</span>
                   <button
-                    type="button" title="Zrušit připomínku"
+                    type="button" title="Zrušit připomínku" aria-label="Zrušit připomínku"
                     onClick={async () => { try { await cancelReminder({ reminderId: r._id }); } catch (e) { errorToast(e); } }}
                     className="rounded-md p-1 text-a-text-4 hover:bg-a-elevated hover:text-a-text cursor-pointer"
                   >
@@ -192,7 +192,7 @@ export function SavedView() {
           key={m._id} messageId={m._id} item={m}
           action={
             <button
-              type="button" title="Odebrat z uložených"
+              type="button" title="Odebrat z uložených" aria-label="Odebrat z uložených"
               onClick={async () => { try { await toggleSaved({ messageId: m._id }); } catch (e) { errorToast(e); } }}
               className="rounded-md p-1 text-a-text-4 opacity-0 hover:bg-a-elevated hover:text-a-text group-hover:opacity-100 cursor-pointer"
             >
@@ -272,7 +272,7 @@ export function SearchView() {
   const selectCls = "rounded-lg border border-a-border bg-a-input px-2.5 py-1.5 text-sm text-a-text outline-none focus:border-cyan-500 cursor-pointer";
 
   return (
-    <FeedShell icon={Search} title="Hledat ve zprávách">
+    <FeedShell icon={Search} title="Hledat ve zprávách" aria-label="Hledat ve zprávách">
       <div className="space-y-2">
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-a-text-4" />
@@ -282,7 +282,7 @@ export function SearchView() {
             className="w-full rounded-xl border border-a-border bg-a-input py-2.5 pl-9 pr-9 text-sm text-a-text outline-none focus:border-cyan-500 placeholder:text-a-text-4"
           />
           {input && (
-            <button type="button" onClick={() => setInput("")} className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-a-text-4 hover:text-a-text cursor-pointer" title="Vymazat">
+            <button type="button" onClick={() => setInput("")} className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-a-text-4 hover:text-a-text cursor-pointer" title="Vymazat" aria-label="Vymazat">
               <X className="h-4 w-4" />
             </button>
           )}
@@ -333,7 +333,7 @@ export function ScheduledView() {
   const [toCancel, setToCancel] = useState<Id<"chatScheduled"> | null>(null);
 
   return (
-    <FeedShell icon={Clock} title="Naplánované zprávy">
+    <FeedShell icon={Clock} title="Naplánované zprávy" aria-label="Naplánované zprávy">
       {scheduled.length === 0 ? (
         <div className="py-16 text-center text-sm text-a-text-4">
           Nic naplánovaného. Zprávu naplánuješ šipkou vedle tlačítka Odeslat.
@@ -378,16 +378,76 @@ export function ScheduledView() {
       })}
       {editing && (
         <WhenDialog
-          title="Změnit čas odeslání" presets={SCHEDULE_PRESETS} confirmLabel="Uložit" initial={editing.sendAt}
+          title="Změnit čas odeslání" aria-label="Změnit čas odeslání" presets={SCHEDULE_PRESETS} confirmLabel="Uložit" initial={editing.sendAt}
           onClose={() => setEditing(null)}
           onPick={async (ts) => { try { await changeTime({ scheduledId: editing.id, sendAt: ts }); toast(`Odešle se ${formatWhen(ts)}`, "success"); } catch (e) { errorToast(e); } }}
         />
       )}
       <ConfirmDialog
-        open={!!toCancel} title="Zrušit naplánovanou zprávu?" description="Zpráva se neodešle a její přílohy se smažou." confirmLabel="Zrušit zprávu"
+        open={!!toCancel} title="Zrušit naplánovanou zprávu?" aria-label="Zrušit naplánovanou zprávu?" description="Zpráva se neodešle a její přílohy se smažou." confirmLabel="Zrušit zprávu"
         onClose={() => setToCancel(null)}
         onConfirm={async () => { if (toCancel) { try { await cancel({ scheduledId: toCancel }); } catch (e) { errorToast(e); } } }}
       />
+    </FeedShell>
+  );
+}
+
+const ACTIVITY_META: Record<string, { icon: typeof Bell; label: (actor: string, where: string) => string }> = {
+  mention: { icon: AtSign, label: (a, w) => `${a} tě zmínil(a) v ${w}` },
+  dm: { icon: MessagesSquare, label: (a) => `${a} ti napsal(a)` },
+  reply: { icon: MessageSquareReply, label: (a, w) => `${a} odpověděl(a) ve vlákně v ${w}` },
+  reaction: { icon: SmilePlus, label: (a) => `${a} reagoval(a) na tvou zprávu` },
+  added: { icon: UserPlus, label: (a, w) => `${a} tě přidal(a) do ${w}` },
+};
+
+/** Jeden proud toho, co se týká přímo mě — zmínky, reakce, odpovědi, pozvánky. */
+export function ActivityView() {
+  const items = useQuery(api.chatActivity.list);
+  const markRead = useMutation(api.chatActivity.markRead);
+  const { userMap, channelTitle, channelMap } = useChat();
+  const hasUnread = items?.some((i) => i.unread);
+
+  // Otevření stránky = přečteno.
+  useEffect(() => {
+    if (hasUnread) void markRead().catch(() => {});
+  }, [hasUnread, markRead]);
+
+  return (
+    <FeedShell icon={Bell} title="Aktivita" aria-label="Aktivita">
+      {items === undefined ? (
+        <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-a-text-4" /></div>
+      ) : items.length === 0 ? (
+        <div className="py-16 text-center text-sm text-a-text-4">
+          Tady uvidíš pohromadě všechno, co se týká přímo tebe — zmínky, reakce na tvé zprávy, odpovědi ve vláknech a přidání do kanálu.
+        </div>
+      ) : items.map((a) => {
+        const meta = ACTIVITY_META[a.kind] ?? ACTIVITY_META.mention;
+        const Icon = meta.icon;
+        const where = a.channelKind === "channel"
+          ? `#${a.channelName}`
+          : channelTitle({ kind: "dm", dmUserIds: channelMap.get(a.channelId)?.dmUserIds ?? [] });
+        const actor = displayName(userMap.get(a.actorId));
+        const href = a.parentId
+          ? `/chat/${a.channelId}?vlakno=${a.parentId}`
+          : a.messageId ? `/chat/${a.channelId}?zprava=${a.messageId}` : `/chat/${a.channelId}`;
+        return (
+          <Link
+            key={a._id} href={href}
+            className={cn("flex gap-3 rounded-2xl border bg-a-surface p-4 transition-colors hover:bg-a-hover", a.unread ? "border-cyan-500" : "border-a-border")}
+          >
+            <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-a-elevated text-a-text-3">
+              {a.kind === "reaction" && a.emoji ? <span className="text-base leading-none">{a.emoji}</span> : <Icon className="h-4 w-4" />}
+            </span>
+            <div className="min-w-0 flex-1 text-sm text-a-text-2">
+              <div className="flex items-baseline gap-2">
+                <span className="truncate font-medium text-a-text">{meta.label(actor, where)}</span>
+                <span className="ml-auto shrink-0 text-xs text-a-text-4" title={formatDateTime(a.createdAt)}>{timeAgo(a.createdAt)}</span>
+              </div>
+              {a.text && <Snippet text={a.text} attachments={a.attachmentCount} />}
+            </div>
+          </Link>
+        );
+      })}
     </FeedShell>
   );
 }

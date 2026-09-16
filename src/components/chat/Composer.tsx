@@ -21,6 +21,9 @@ import { WhenDialog } from "./WhenDialog";
 import { SCHEDULE_PRESETS, formatWhen } from "./when";
 import { toast } from "@/lib/toast";
 import { encodeMessage, fold, type PickedMentions } from "./tokens";
+import { CHAT_COMMANDS, dndUntil, parseCommand, parseDuration, type ChatCommand } from "./commands";
+import { ShortcutsDialog } from "./ShortcutsDialog";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 const MAX_BYTES = 20 * 1024 * 1024;
 
@@ -29,6 +32,7 @@ export type ComposerHandle = { addFiles: (files: File[]) => void; focus: () => v
 type Pending = { key: string; name: string; size: number; pct: number; storageId?: Id<"_storage">; failed?: boolean };
 
 type Suggestion =
+  | { type: "command"; command: ChatCommand }
   | { type: "user"; id: string; label: string; sub: string; user: Parameters<typeof UserAvatar>[0]["user"] }
   | { type: "kanal" }
   | { type: "channel"; id: string; name: string }
@@ -62,6 +66,15 @@ export function Composer({
   const [gif, setGif] = useState<Gif | null>(null);
   const [scheduleMenu, setScheduleMenu] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [confirmLeave, setConfirmLeave] = useState(false);
+  const [gifQuery, setGifQuery] = useState<string | null>(null);
+  const setDnd = useMutation(api.presence.setDnd);
+  const setStatus = useMutation(api.presence.setStatus);
+  const createPoll = useMutation(api.chatPolls.create);
+  const addMembers = useMutation(api.chat.addMembers);
+  const updateChannel = useMutation(api.chat.update);
+  const leaveChannel = useMutation(api.chat.leave);
   const send = useMutation(api.chatMessages.send);
   const generateUploadUrl = useMutation(api.chatMessages.generateUploadUrl);
   const setTyping = useMutation(api.presence.setTyping);
@@ -77,6 +90,8 @@ export function Composer({
   const [dismissedAt, setDismissedAt] = useState<number | null>(null);
   const areaRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const memberCandidates = useMemo(() => [...userMap.values()].filter((u) => u.status === "active"), [userMap]);
 
   const channels = useMemo(() => (sidebar?.channels ?? []).filter((c) => c.kind === "channel"), [sidebar]);
   const channelIdByName = useMemo(() => new Map(channels.map((c) => [c.name ?? "", c._id as string])), [channels]);
@@ -167,7 +182,20 @@ export function Composer({
     return null;
   }, [text, caret]);
 
+  // Příkaz musí být na začátku zprávy, jinak zůstává „/“ obyčejným textem.
+  const commandQuery = useMemo(() => {
+    if (parentId || !text.startsWith("/") || text.includes("\n")) return null;
+    const m = text.match(/^\/([\p{L}]*)$/u);
+    return m ? m[1].toLowerCase() : null;
+  }, [text, parentId]);
+
   const suggestions = useMemo<Suggestion[]>(() => {
+    if (commandQuery !== null) {
+      return CHAT_COMMANDS
+        .filter((c) => !c.channelOnly || canMentionChannel || memberIds.length > 0)
+        .filter((c) => c.name.slice(1).startsWith(commandQuery))
+        .map((c) => ({ type: "command", command: c }));
+    }
     if (!trigger || dismissedAt === trigger.start) return [];
     const q = fold(trigger.query);
     if (trigger.kind === "@") {
@@ -192,9 +220,20 @@ export function Composer({
       .slice(0, 4)
       .map((e) => ({ type: "emoji", emoji: `:${e.name}:`, name: e.name }));
     return [...custom, ...searchShortcodes(trigger.query).map(([emoji, names]): Suggestion => ({ type: "emoji", emoji, name: names[0] }))].slice(0, 8);
-  }, [trigger, dismissedAt, memberIds, me._id, userMap, canMentionChannel, channels, customEmoji]);
+  }, [commandQuery, trigger, dismissedAt, memberIds, me._id, userMap, canMentionChannel, channels, customEmoji]);
 
   const applySuggestion = (s: Suggestion) => {
+    if (s.type === "command") {
+      const next = `${s.command.name} `;
+      setText(next);
+      writeDraft(draftKey, next);
+      setCaret(next.length);
+      requestAnimationFrame(() => {
+        areaRef.current?.focus();
+        areaRef.current?.setSelectionRange(next.length, next.length);
+      });
+      return;
+    }
     if (!trigger) return;
     let insert = "";
     if (s.type === "user") {
@@ -257,8 +296,90 @@ export function Composer({
     }
   };
 
+  /** Vyhodnotí `/příkaz`. Vrací true, když se o text postaral (zpráva se pak neodesílá). */
+  const runCommand = async (): Promise<boolean> => {
+    const cmd = parseCommand(text.trim());
+    if (!cmd || parentId) return false;
+    const known = CHAT_COMMANDS.find((c) => c.name === cmd.name);
+    if (!known) {
+      toast(`Příkaz ${cmd.name} neznám.`, "error", "Napiš „/“ a vyber ze seznamu.");
+      return true;
+    }
+    const done = (msg?: string) => { resetAfterSend(); if (msg) toast(msg, "success"); };
+    try {
+      switch (cmd.name) {
+        case "/dnd": {
+          if (/^(zrusit|zrušit|off|vypnout)$/i.test(cmd.rest)) { await setDnd({ until: null }); done("Nerušit vypnuto"); break; }
+          const ms = parseDuration(cmd.rest);
+          if (!ms) { toast("Nerozumím času.", "error", "Zkus /dnd 30m, /dnd 1h nebo /dnd zitra."); return true; }
+          await setDnd({ until: dndUntil(ms) });
+          done(`Nerušit na ${cmd.rest || "1h"}`);
+          break;
+        }
+        case "/stav": {
+          if (!cmd.rest || /^(zrusit|zrušit|off)$/i.test(cmd.rest)) { await setStatus({ emoji: null, text: null, until: null }); done("Stav zrušen"); break; }
+          // První „slovo“ bereme jako emoji, když to není písmeno.
+          const [first, ...restWords] = cmd.rest.split(/\s+/);
+          const hasEmoji = !/^[\p{L}\p{N}]/u.test(first);
+          await setStatus({ emoji: hasEmoji ? first : "💬", text: hasEmoji ? restWords.join(" ") : cmd.rest, until: null });
+          done("Stav nastaven");
+          break;
+        }
+        case "/anketa": {
+          const [question, ...options] = cmd.rest.split("|").map((x) => x.trim()).filter(Boolean);
+          if (!question || options.length < 2) { toast("Anketa potřebuje otázku a aspoň dvě volby.", "error", "Např. /anketa Kdy? | Pondělí | Středa"); return true; }
+          await createPoll({ channelId, question, options, multiple: false });
+          done();
+          break;
+        }
+        case "/gif":
+          setGifQuery(cmd.rest);
+          setText("");
+          writeDraft(draftKey, "");
+          break;
+        case "/pozvat": {
+          const ids = [...cmd.rest.matchAll(/@([\p{L}\p{N}._-]+)/gu)]
+            .map((m) => fold(m[1]))
+            .map((needle) => memberCandidates.find((u) => fold((u.name ?? "").replace(/\s+/g, "")).startsWith(needle) || fold(u.email.split("@")[0]).startsWith(needle)))
+            .filter((u): u is NonNullable<typeof u> => !!u)
+            .map((u) => u._id);
+          if (!ids.length) { toast("Nikoho takového nevidím.", "error", "Zkus /pozvat @jmeno."); return true; }
+          const added = await addMembers({ channelId, userIds: ids });
+          done(added.length ? `Přidáno: ${added.length}` : "Všichni už v kanálu jsou");
+          break;
+        }
+        case "/tema":
+          await updateChannel({ channelId, topic: cmd.rest || null });
+          done(cmd.rest ? "Téma změněno" : "Téma smazáno");
+          break;
+        case "/prejmenovat":
+          if (!cmd.rest) { toast("Napiš nový název.", "error"); return true; }
+          await updateChannel({ channelId, name: cmd.rest });
+          done("Kanál přejmenován");
+          break;
+        case "/odejit":
+          setConfirmLeave(true);
+          break;
+        case "/hledat":
+          setText("");
+          writeDraft(draftKey, "");
+          router.push(cmd.rest ? `/chat/hledat?q=${encodeURIComponent(cmd.rest)}` : "/chat/hledat");
+          break;
+        case "/zkratky":
+          setText("");
+          writeDraft(draftKey, "");
+          setShortcutsOpen(true);
+          break;
+      }
+    } catch (e) {
+      errorToast(e);
+    }
+    return true;
+  };
+
   const submit = async () => {
     if (!canSend) return;
+    if (await runCommand()) return;
     const body = encodeMessage(text, picked, channelIdByName);
     const attachments = pending.filter((p) => p.storageId).map((p) => ({ storageId: p.storageId!, name: p.name }));
     setSending(true);
@@ -291,11 +412,11 @@ export function Composer({
       {suggestions.length > 0 && (
         <div className="absolute bottom-full left-0 right-0 z-30 mb-1 overflow-hidden rounded-xl border border-a-border bg-a-surface py-1 shadow-xl">
           <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-a-text-4">
-            {trigger?.kind === "@" ? "Lidé v kanálu" : trigger?.kind === "#" ? "Kanály" : "Emoji"}
+            {commandQuery !== null ? "Příkazy" : trigger?.kind === "@" ? "Lidé v kanálu" : trigger?.kind === "#" ? "Kanály" : "Emoji"}
           </div>
           {suggestions.map((s, i) => (
             <button
-              key={s.type === "user" ? s.id : s.type === "channel" ? s.id : s.type === "emoji" ? s.emoji : "kanal"}
+              key={s.type === "user" ? s.id : s.type === "channel" ? s.id : s.type === "emoji" ? s.emoji : s.type === "command" ? s.command.name : "kanal"}
               type="button"
               onMouseDown={(e) => { e.preventDefault(); applySuggestion(s); }}
               onMouseEnter={() => setActiveIdx(i)}
@@ -304,6 +425,7 @@ export function Composer({
               {s.type === "user" && (<><UserAvatar user={s.user} size="xs" /><span className="font-medium">{s.label}</span><span className="truncate text-xs text-a-text-4">{s.sub}</span></>)}
               {s.type === "kanal" && (<><Megaphone className="h-4 w-4" /><span className="font-medium">@kanal</span><span className="text-xs text-a-text-4">upozorní všechny členy kanálu</span></>)}
               {s.type === "channel" && (<><Hash className="h-4 w-4" /><span className="font-medium">{s.name}</span></>)}
+              {s.type === "command" && (<><span className="font-mono font-medium">{s.command.name}</span><span className="truncate text-xs text-a-text-4">{s.command.args}</span><span className="ml-auto truncate text-xs text-a-text-3">{s.command.desc}</span></>)}
               {s.type === "emoji" && (<><EmojiGlyph emoji={s.emoji} className="text-lg leading-none" /><span className="text-a-text-3">:{s.name}:</span></>)}
             </button>
           ))}
@@ -317,7 +439,7 @@ export function Composer({
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={gif.previewUrl} alt={gif.title} className="block max-h-28 w-auto" />
               <button
-                type="button" onClick={() => setGif(null)} title="Odebrat GIF"
+                type="button" onClick={() => setGif(null)} title="Odebrat GIF" aria-label="Odebrat GIF"
                 className="absolute right-1 top-1 rounded-full bg-black/60 p-1 text-white hover:bg-black/80 cursor-pointer"
               >
                 <X className="h-3.5 w-3.5" />
@@ -334,7 +456,7 @@ export function Composer({
                   <div className="truncate font-medium text-a-text-2">{p.name}</div>
                   <div className="text-a-text-4">{p.storageId ? formatBytes(p.size) : `${p.pct} %`}</div>
                 </div>
-                <button type="button" onClick={() => setPending((x) => x.filter((f) => f.key !== p.key))} className="shrink-0 rounded p-0.5 text-a-text-4 hover:text-a-text cursor-pointer" title="Odebrat">
+                <button type="button" onClick={() => setPending((x) => x.filter((f) => f.key !== p.key))} className="shrink-0 rounded p-0.5 text-a-text-4 hover:text-a-text cursor-pointer" title="Odebrat" aria-label="Odebrat">
                   <X className="h-3.5 w-3.5" />
                 </button>
               </div>
@@ -356,23 +478,23 @@ export function Composer({
           className="block max-h-[200px] w-full resize-none bg-transparent px-3 py-2.5 text-sm text-a-text outline-none! placeholder:text-a-text-4"
         />
         <div className="flex items-center gap-1 px-2 pb-2">
-          <button type="button" onClick={() => fileRef.current?.click()} className="rounded-lg p-1.5 text-a-text-3 hover:bg-a-hover hover:text-a-text cursor-pointer" title="Přiložit soubor">
+          <button type="button" onClick={() => fileRef.current?.click()} className="rounded-lg p-1.5 text-a-text-3 hover:bg-a-hover hover:text-a-text cursor-pointer" title="Přiložit soubor" aria-label="Přiložit soubor">
             <Paperclip className="h-4 w-4" />
           </button>
           <EmojiPicker onSelect={insertAtCaret} align="start">
-            <button type="button" className="rounded-lg p-1.5 text-a-text-3 hover:bg-a-hover hover:text-a-text cursor-pointer" title="Emoji">
+            <button type="button" className="rounded-lg p-1.5 text-a-text-3 hover:bg-a-hover hover:text-a-text cursor-pointer" title="Emoji" aria-label="Emoji">
               <Smile className="h-4 w-4" />
             </button>
           </EmojiPicker>
           <GifPicker onSelect={setGif}>
-            <button type="button" className="rounded-lg p-1.5 text-a-text-3 hover:bg-a-hover hover:text-a-text cursor-pointer" title="GIF z Giphy">
+            <button type="button" className="rounded-lg p-1.5 text-a-text-3 hover:bg-a-hover hover:text-a-text cursor-pointer" title="GIF z Giphy" aria-label="GIF z Giphy">
               <Film className="h-4 w-4" />
             </button>
           </GifPicker>
-          <button type="button" onClick={() => setPollOpen(true)} className="rounded-lg p-1.5 text-a-text-3 hover:bg-a-hover hover:text-a-text cursor-pointer" title="Anketa">
+          <button type="button" onClick={() => setPollOpen(true)} className="rounded-lg p-1.5 text-a-text-3 hover:bg-a-hover hover:text-a-text cursor-pointer" title="Anketa" aria-label="Anketa">
             <BarChart3 className="h-4 w-4" />
           </button>
-          <button type="button" onClick={() => insertAtCaret(text && !/\s$/.test(text.slice(0, caret)) ? " @" : "@")} className="rounded-lg p-1.5 text-a-text-3 hover:bg-a-hover hover:text-a-text cursor-pointer" title="Zmínit člověka">
+          <button type="button" onClick={() => insertAtCaret(text && !/\s$/.test(text.slice(0, caret)) ? " @" : "@")} className="rounded-lg p-1.5 text-a-text-3 hover:bg-a-hover hover:text-a-text cursor-pointer" title="Zmínit člověka" aria-label="Zmínit člověka">
             <AtSign className="h-4 w-4" />
           </button>
           <input ref={fileRef} type="file" multiple className="hidden" onChange={(e) => { void addFiles([...(e.target.files ?? [])]); e.target.value = ""; }} />
@@ -386,7 +508,7 @@ export function Composer({
           <span className={cn("hidden text-[10px] text-a-text-4", !parentId && "xl:inline")}>*tučně* _kurzíva_ `kód` · Shift+Enter nový řádek</span>
           <div className="ml-2 flex shrink-0">
             <button
-              type="button" onClick={() => void submit()} disabled={!canSend} title="Odeslat (Enter)"
+              type="button" onClick={() => void submit()} disabled={!canSend} title="Odeslat (Enter)" aria-label="Odeslat (Enter)"
               className="inline-flex h-8 w-8 items-center justify-center rounded-l-lg bg-accent-primary text-white hover:bg-accent-hover disabled:opacity-40 cursor-pointer disabled:cursor-default"
             >
               {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
@@ -394,7 +516,7 @@ export function Composer({
             <Popover.Root open={scheduleMenu} onOpenChange={setScheduleMenu}>
               <Popover.Trigger asChild>
                 <button
-                  type="button" disabled={!canSend} title="Naplánovat odeslání"
+                  type="button" disabled={!canSend} title="Naplánovat odeslání" aria-label="Naplánovat odeslání"
                   className="inline-flex h-8 w-6 items-center justify-center rounded-r-lg border-l border-white/30 bg-accent-primary text-white hover:bg-accent-hover disabled:opacity-40 cursor-pointer disabled:cursor-default"
                 >
                   <ChevronDown className="h-3.5 w-3.5" />
@@ -419,10 +541,21 @@ export function Composer({
           </div>
         </div>
       </div>
+      {shortcutsOpen && <ShortcutsDialog onClose={() => setShortcutsOpen(false)} />}
+      <ConfirmDialog
+        open={confirmLeave} title="Opustit kanál?" aria-label="Opustit kanál?" description="Kdykoli se můžeš vrátit (u privátního tě musí znovu přidat člen)." confirmLabel="Opustit" destructive={false}
+        onClose={() => setConfirmLeave(false)}
+        onConfirm={async () => { try { await leaveChannel({ channelId }); resetAfterSend(); router.push("/chat"); } catch (e) { errorToast(e); } }}
+      />
+      {gifQuery !== null && (
+        <GifPicker onSelect={(g) => { setGif(g); setGifQuery(null); }} initialQuery={gifQuery} openOnMount onClose={() => setGifQuery(null)}>
+          <span />
+        </GifPicker>
+      )}
       {pollOpen && <PollDialog channelId={channelId} parentId={parentId} onClose={() => setPollOpen(false)} />}
       {scheduleOpen && (
         <WhenDialog
-          title="Naplánovat odeslání"
+          title="Naplánovat odeslání" aria-label="Naplánovat odeslání"
           description="Zpráva odejde automaticky. Do té doby ji můžeš zrušit v Naplánovaných."
           presets={SCHEDULE_PRESETS}
           confirmLabel="Naplánovat"

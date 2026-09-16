@@ -14,6 +14,7 @@ import { notify } from "./notifications";
 import { deleteChatBlobs } from "./chatMessages";
 import { internal } from "./_generated/api";
 import { deleteRemindersBy, deleteScheduledBy } from "./chatSchedule";
+import { deleteActivityFor, logActivity } from "./chatActivity";
 
 export const DEFAULT_CHANNEL_NAME = "obecne";
 const MAX_DM_USERS = 9; // já + 8 dalších
@@ -137,6 +138,7 @@ export async function deleteUserChatData(ctx: MutationCtx, userId: Id<"users">) 
   for (const r of await ctx.db.query("presence").withIndex("by_user", (q) => q.eq("userId", userId)).collect()) {
     await ctx.db.delete(r._id);
   }
+  await deleteActivityFor(ctx, await ctx.db.query("chatActivity").withIndex("by_user", (q) => q.eq("userId", userId)).collect());
   await deleteRemindersBy(ctx, await ctx.db.query("chatReminders").withIndex("by_user", (q) => q.eq("userId", userId)).collect());
   await deleteScheduledBy(ctx, await ctx.db.query("chatScheduled").withIndex("by_user", (q) => q.eq("userId", userId)).collect());
 }
@@ -171,6 +173,7 @@ export const mySidebar = query({
         muted: !!m.muted,
         notify: m.notify ?? (c.kind === "dm" ? "all" : "mentions"),
         mentionCount: m.mentionCount,
+        section: m.section,
         unread: c.lastMessageAt > m.lastReadAt,
       });
     }
@@ -322,6 +325,7 @@ async function addMembersInternal(ctx: MutationCtx, channelId: Id<"chatChannels"
   if (!added.length) return added;
   await insertSystemMessage(ctx, channelId, me._id, `<@${me._id}> přidal(a) do kanálu ${mentionList(added)}`);
   for (const uid of added) {
+    await logActivity(ctx, { userId: uid, kind: "added", channelId, actorId: me._id });
     await notify(ctx, {
       userId: uid,
       type: "chat_added",
@@ -486,6 +490,7 @@ export const purgeChannel = internalMutation({
 
     await deleteRemindersBy(ctx, await ctx.db.query("chatReminders").withIndex("by_channel", (q) => q.eq("channelId", channel._id)).collect());
     await deleteScheduledBy(ctx, await ctx.db.query("chatScheduled").withIndex("by_channel", (q) => q.eq("channelId", channel._id)).collect());
+    await deleteActivityFor(ctx, await ctx.db.query("chatActivity").withIndex("by_channel", (q) => q.eq("channelId", channel._id)).collect());
     for (const table of ["chatMembers", "chatThreadFollows", "chatMentions", "chatSaved", "chatTyping"] as const) {
       const rows = await ctx.db.query(table).withIndex("by_channel", (q) => q.eq("channelId", channel._id)).collect();
       for (const r of rows) await ctx.db.delete(r._id);
@@ -502,12 +507,15 @@ export const setPrefs = mutation({
     starred: v.optional(v.boolean()),
     muted: v.optional(v.boolean()),
     notify: v.optional(chatNotifyValidator),
+    /** Vlastní sekce v panelu; `null` = bez sekce. */
+    section: v.optional(v.union(v.string(), v.null())),
   },
   handler: async (ctx, args) => {
     const me = await requireUser(ctx);
     const membership = await getMembership(ctx, args.channelId, me._id);
     if (!membership) throw new ConvexError("Nejsi členem kanálu.");
     const patch: Partial<Doc<"chatMembers">> = {};
+    if (args.section !== undefined) patch.section = args.section?.trim().slice(0, 40) || undefined;
     if (args.starred !== undefined) patch.starred = args.starred;
     if (args.muted !== undefined) patch.muted = args.muted;
     if (args.notify !== undefined) patch.notify = args.notify;

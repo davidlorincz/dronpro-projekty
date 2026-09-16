@@ -426,6 +426,8 @@ export default defineSchema({
     starred: v.optional(v.boolean()),
     muted: v.optional(v.boolean()),
     notify: v.optional(chatNotifyValidator), // default: DM all, kanál mentions
+    /** Vlastní sekce v postranním panelu („Klienti“), per uživatel. */
+    section: v.optional(v.string()),
   })
     .index("by_user", ["userId"])
     .index("by_channel", ["channelId"])
@@ -539,6 +541,40 @@ export default defineSchema({
     createdBy: v.id("users"),
     createdAt: v.number(),
   }).index("by_name", ["name"]),
+
+  // Proud „Aktivita“ — co se týká přímo mě (zmínky, reakce, odpovědi, přidání do kanálu).
+  // Zapisuje se cíleně jednomu člověku, takže je to levné i ve velkém kanálu.
+  chatActivity: defineTable({
+    userId: v.id("users"),
+    kind: v.union(
+      v.literal("mention"),
+      v.literal("reaction"),
+      v.literal("reply"),
+      v.literal("dm"),
+      v.literal("added"),
+    ),
+    channelId: v.id("chatChannels"),
+    messageId: v.optional(v.id("chatMessages")),
+    actorId: v.id("users"),
+    emoji: v.optional(v.string()),
+    readAt: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId", "createdAt"])
+    .index("by_user_unread", ["userId", "readAt"])
+    .index("by_message", ["messageId"])
+    .index("by_channel", ["channelId"]),
+
+  // Náhledy externích odkazů (Open Graph). Sdílené pro všechny, klíčem je URL.
+  linkPreviews: defineTable({
+    url: v.string(),
+    title: v.optional(v.string()),
+    description: v.optional(v.string()),
+    image: v.optional(v.string()),
+    siteName: v.optional(v.string()),
+    failed: v.optional(v.boolean()),
+    fetchedAt: v.number(),
+  }).index("by_url", ["url"]),
 
   // Online tečky. Samostatná tabulka, NE pole na `users`: heartbeat každou minutu
   // by jinak invalidoval každý dotaz, který čte uživatele (users.list, loadUserMap…).

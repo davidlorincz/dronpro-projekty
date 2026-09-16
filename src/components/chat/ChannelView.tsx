@@ -145,7 +145,7 @@ function ChannelInner({ channel }: { channel: ChannelDetail }) {
       >
         {/* Hlavička */}
         <div className="flex h-14 shrink-0 items-center gap-2 border-b border-a-border px-3 md:px-4">
-          <Link href="/chat" className="rounded-lg p-1.5 text-a-text-3 hover:bg-a-hover md:hidden" title="Zpět"><ArrowLeft className="h-4 w-4" /></Link>
+          <Link href="/chat" className="rounded-lg p-1.5 text-a-text-3 hover:bg-a-hover md:hidden" title="Zpět" aria-label="Zpět"><ArrowLeft className="h-4 w-4" /></Link>
           <button type="button" onClick={() => setParam("detail", "about")} className="flex min-w-0 items-center gap-1.5 rounded-lg px-1.5 py-1 hover:bg-a-hover cursor-pointer">
             {channel.kind === "channel" ? (
               channel.visibility === "private" ? <Lock className="h-4 w-4 shrink-0 text-a-text-3" /> : <Hash className="h-4 w-4 shrink-0 text-a-text-3" />
@@ -170,26 +170,26 @@ function ChannelInner({ channel }: { channel: ChannelDetail }) {
           )}
           <div className="ml-auto flex shrink-0 items-center gap-1">
             {channel.kind === "channel" && (
-              <button type="button" onClick={() => setParam("detail", "members")} className="flex items-center gap-1.5 rounded-lg px-1.5 py-1 hover:bg-a-hover cursor-pointer" title="Členové">
+              <button type="button" onClick={() => setParam("detail", "members")} className="flex items-center gap-1.5 rounded-lg px-1.5 py-1 hover:bg-a-hover cursor-pointer" title="Členové" aria-label="Členové">
                 <UserAvatars users={channel.members.slice(0, 3).map((m) => userMap.get(m.userId)).filter((u): u is NonNullable<typeof u> => !!u)} size="xs" max={3} />
                 <span className="text-xs font-medium text-a-text-3">{channel.members.length}</span>
               </button>
             )}
             {channel.canRead && (
               <>
-                <Link href={`/chat/hledat?v=${channel._id}`} className="hidden rounded-lg p-1.5 text-a-text-3 hover:bg-a-hover sm:block" title="Hledat v konverzaci">
+                <Link href={`/chat/hledat?v=${channel._id}`} className="hidden rounded-lg p-1.5 text-a-text-3 hover:bg-a-hover sm:block" title="Hledat v konverzaci" aria-label="Hledat v konverzaci">
                   <Search className="h-4 w-4" />
                 </Link>
-                <button type="button" onClick={() => setParam("detail", sidePanel === "pinned" ? null : "pinned")} className={cn("rounded-lg p-1.5 hover:bg-a-hover cursor-pointer", sidePanel === "pinned" ? "text-a-accent-text" : "text-a-text-3")} title="Připnuté zprávy">
+                <button type="button" onClick={() => setParam("detail", sidePanel === "pinned" ? null : "pinned")} className={cn("rounded-lg p-1.5 hover:bg-a-hover cursor-pointer", sidePanel === "pinned" ? "text-a-accent-text" : "text-a-text-3")} title="Připnuté zprávy" aria-label="Připnuté zprávy">
                   <Pin className="h-4 w-4" />
                 </button>
-                <button type="button" onClick={() => setParam("detail", sidePanel === "files" ? null : "files")} className={cn("rounded-lg p-1.5 hover:bg-a-hover cursor-pointer", sidePanel === "files" ? "text-a-accent-text" : "text-a-text-3")} title="Soubory">
+                <button type="button" onClick={() => setParam("detail", sidePanel === "files" ? null : "files")} className={cn("rounded-lg p-1.5 hover:bg-a-hover cursor-pointer", sidePanel === "files" ? "text-a-accent-text" : "text-a-text-3")} title="Soubory" aria-label="Soubory">
                   <Paperclip className="h-4 w-4" />
                 </button>
               </>
             )}
             {isMember && channel.membership && <NotifyMenu channel={channel} />}
-            <button type="button" onClick={() => setParam("detail", detailTab ? null : "about")} className={cn("rounded-lg p-1.5 hover:bg-a-hover cursor-pointer", detailTab ? "text-a-accent-text" : "text-a-text-3")} title="Detail kanálu">
+            <button type="button" onClick={() => setParam("detail", detailTab ? null : "about")} className={cn("rounded-lg p-1.5 hover:bg-a-hover cursor-pointer", detailTab ? "text-a-accent-text" : "text-a-text-3")} title="Detail kanálu" aria-label="Detail kanálu">
               <Info className="h-4 w-4" />
             </button>
           </div>
@@ -295,7 +295,7 @@ function NotifyMenu({ channel }: { channel: ChannelDetail }) {
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger asChild>
-        <button type="button" className="rounded-lg p-1.5 text-a-text-3 hover:bg-a-hover cursor-pointer" title="Upozornění">
+        <button type="button" className="rounded-lg p-1.5 text-a-text-3 hover:bg-a-hover cursor-pointer" title="Upozornění" aria-label="Upozornění">
           {m.muted || m.notify === "none" ? <BellOff className="h-4 w-4" /> : <Bell className="h-4 w-4" />}
         </button>
       </Popover.Trigger>

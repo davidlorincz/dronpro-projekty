@@ -1,15 +1,17 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import Link from "next/link";
-import { useQuery } from "convex/react";
+import { useAction, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { Archive, Briefcase, CalendarDays, FolderKanban, MapPin, PartyPopper } from "lucide-react";
+import { Archive, Briefcase, CalendarDays, FolderKanban, Globe, MapPin, PartyPopper } from "lucide-react";
 import {
   EVENT_KIND_LABEL, EVENT_KIND_PATH, EVENT_STATUS_CLASS, EVENT_STATUS_LABEL, PRIORITY_CLASS, PRIORITY_LABEL, STATUS_CLASS, STATUS_LABEL,
 } from "@/lib/constants";
 import { formatDate } from "@/lib/dates";
 import { cn } from "@/lib/utils";
+
+const URL_RE = /https?:\/\/[^\s<]+[^\s<.,:;"')\]!?]/g;
 
 // Odkaz z libovolného prostředí appky (dev, prod) — rozhoduje cesta, id ověří server.
 const APP_LINK_RE = /https?:\/\/[^\s/<]+\/(projekty|eventy|zakazky)\/([a-z0-9]{20,40})(?![a-z0-9])/g;
@@ -24,15 +26,59 @@ export function extractAppRefs(text: string) {
   return refs;
 }
 
+/** První externí odkaz ve zprávě — vlastní doména a Giphy se přeskakují. */
+export function extractExternalUrl(text: string) {
+  for (const raw of text.match(URL_RE) ?? []) {
+    try {
+      const u = new URL(raw);
+      if (typeof window !== "undefined" && u.host === window.location.host) continue;
+      if (u.hostname.endsWith("giphy.com")) continue;
+      if (new RegExp(APP_LINK_RE.source).test(raw)) continue; // interní odkaz má vlastní kartu
+      return raw;
+    } catch { /* neplatná URL */ }
+  }
+  return null;
+}
+
 /** Karty pod zprávou s odkazem na projekt, event nebo zakázku. */
 export function LinkPreviews({ text }: { text: string }) {
   const refs = useMemo(() => extractAppRefs(text), [text]);
   const previews = useQuery(api.chatExtras.linkPreviews, refs.length ? { refs } : "skip");
-  if (!previews?.length) return null;
+  const externalUrl = useMemo(() => extractExternalUrl(text), [text]);
+  const external = useQuery(api.links.preview, externalUrl ? { urls: [externalUrl] } : "skip");
+  const ensure = useAction(api.links.ensure);
+
+  // Náhled, který ještě nemáme, si server jednou stáhne.
+  useEffect(() => {
+    if (externalUrl && external?.length === 0) void ensure({ url: externalUrl }).catch(() => {});
+  }, [externalUrl, external, ensure]);
+
+  const card = external?.[0];
+  if (!previews?.length && !card) return null;
 
   return (
     <div className="mt-1.5 flex flex-col gap-1.5">
-      {previews.map((p) => {
+      {card && (
+        <a
+          href={card.url} target="_blank" rel="noopener noreferrer"
+          className="flex max-w-md items-start gap-3 overflow-hidden rounded-xl border border-a-border border-l-4 border-l-a-text-4 bg-a-surface px-3 py-2 hover:bg-a-hover"
+        >
+          {card.image ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={card.image} alt="" className="h-14 w-14 shrink-0 rounded-lg object-cover" />
+          ) : (
+            <Globe className="mt-0.5 h-4 w-4 shrink-0 text-a-text-4" />
+          )}
+          <span className="min-w-0 flex-1">
+            <span className="block text-[10px] font-semibold uppercase tracking-wider text-a-text-4">
+              {card.siteName ?? new URL(card.url).hostname.replace(/^www\./, "")}
+            </span>
+            <span className="block truncate text-sm font-semibold text-a-text">{card.title}</span>
+            {card.description && <span className="line-clamp-2 block text-xs text-a-text-3">{card.description}</span>}
+          </span>
+        </a>
+      )}
+      {(previews ?? []).map((p) => {
         const href = p.type === "project" ? `/projekty/${p.id}` : `${EVENT_KIND_PATH[p.kind]}/${p.id}`;
         const Icon = p.type === "project" ? FolderKanban : p.kind === "event" ? PartyPopper : Briefcase;
         return (

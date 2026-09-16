@@ -10,10 +10,17 @@ import { parseConvexError } from "@/lib/convexError";
 export type Gif = { id: string; url: string; previewUrl: string; width: number; height: number; title: string };
 
 /** Výběr GIFu z Giphy. Ukládá se jen odkaz, GIF se načítá z CDN Giphy. */
-export function GifPicker({ children, onSelect }: { children: ReactNode; onSelect: (gif: Gif) => void }) {
+export function GifPicker({ children, onSelect, initialQuery, openOnMount, onClose }: {
+  children: ReactNode;
+  onSelect: (gif: Gif) => void;
+  /** Předvyplněný dotaz (příkaz `/gif …`). */
+  initialQuery?: string;
+  openOnMount?: boolean;
+  onClose?: () => void;
+}) {
   const search = useAction(api.giphy.search);
-  const [open, setOpen] = useState(false);
-  const [q, setQ] = useState("");
+  const [open, setOpen] = useState(!!openOnMount);
+  const [q, setQ] = useState(initialQuery ?? "");
   const [debounced, setDebounced] = useState("");
   const [items, setItems] = useState<Gif[]>([]);
   const [loading, setLoading] = useState(false);
@@ -39,7 +46,7 @@ export function GifPicker({ children, onSelect }: { children: ReactNode; onSelec
   }, [open, debounced, search]);
 
   return (
-    <Popover.Root open={open} onOpenChange={(v) => { setOpen(v); if (!v) setQ(""); }}>
+    <Popover.Root open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setQ(""); onClose?.(); } }}>
       <Popover.Trigger asChild>{children}</Popover.Trigger>
       <Popover.Portal>
         <Popover.Content

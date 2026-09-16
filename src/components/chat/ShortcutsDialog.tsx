@@ -1,6 +1,7 @@
 "use client";
 
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { CHAT_COMMANDS } from "./commands";
 
 const GROUPS: { title: string; items: [string, string][] }[] = [
   {
@@ -51,6 +52,17 @@ export function ShortcutsDialog({ onClose }: { onClose: () => void }) {
           <DialogDescription>Co appka umí bez myši.</DialogDescription>
         </DialogHeader>
         <div className="max-h-[60vh] space-y-4 overflow-y-auto">
+          <div>
+            <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-a-text-4">Příkazy v chatu (napiš „/“)</div>
+            <div className="space-y-1">
+              {CHAT_COMMANDS.map((c) => (
+                <div key={c.name} className="flex items-baseline gap-3 text-sm">
+                  <kbd className="shrink-0 rounded border border-a-border bg-a-elevated px-1.5 py-0.5 font-mono text-[11px] text-a-text-2">{c.name} {c.args}</kbd>
+                  <span className="text-a-text-3">{c.desc}</span>
+                </div>
+              ))}
+            </div>
+          </div>
           {GROUPS.map((g) => (
             <div key={g.title}>
               <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-a-text-4">{g.title}</div>

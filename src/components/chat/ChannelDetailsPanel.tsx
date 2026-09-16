@@ -93,7 +93,7 @@ export function ChannelDetailsPanel({ channel, title, tab, onTab, onClose }: {
     <div className="flex h-full flex-col bg-a-surface">
       <div className="flex h-14 shrink-0 items-center gap-2 border-b border-a-border px-4">
         <div className="min-w-0 truncate font-semibold text-a-text">{isChannel ? `#${channel.name}` : title}</div>
-        <button type="button" onClick={onClose} className="ml-auto rounded-lg p-1.5 text-a-text-3 hover:bg-a-hover hover:text-a-text cursor-pointer" title="Zavřít (Esc)">
+        <button type="button" onClick={onClose} className="ml-auto rounded-lg p-1.5 text-a-text-3 hover:bg-a-hover hover:text-a-text cursor-pointer" title="Zavřít (Esc)" aria-label="Zavřít (Esc)">
           <X className="h-4 w-4" />
         </button>
       </div>
@@ -200,13 +200,13 @@ export function ChannelDetailsPanel({ channel, title, tab, onTab, onClose }: {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5 truncate text-sm font-medium text-a-text">
                       {displayName(u)}{m.userId === me._id && <span className="font-normal text-a-text-4">(ty)</span>}
-                      {m.role === "owner" && <span title="Vlastník kanálu"><Crown className="h-3.5 w-3.5 text-amber-500" /></span>}
+                      {m.role === "owner" && <span title="Vlastník kanálu" aria-label="Vlastník kanálu"><Crown className="h-3.5 w-3.5 text-amber-500" /></span>}
                     </div>
                     <div className="truncate text-xs text-a-text-4">{u?.email}</div>
                   </div>
                   {m.userId !== me._id && (
                     <button
-                      type="button" title="Poslat přímou zprávu"
+                      type="button" title="Poslat přímou zprávu" aria-label="Poslat přímou zprávu"
                       onClick={async () => { try { router.push(`/chat/${await openDm({ userIds: [m.userId] })}`); } catch (e) { errorToast(e); } }}
                       className="hidden rounded-md p-1 text-a-text-4 hover:bg-a-elevated hover:text-a-text group-hover:block cursor-pointer"
                     >
@@ -215,7 +215,7 @@ export function ChannelDetailsPanel({ channel, title, tab, onTab, onClose }: {
                   )}
                   {isChannel && channel.canManage && !channel.isDefault && m.userId !== me._id && (
                     <button
-                      type="button" title="Odebrat z kanálu"
+                      type="button" title="Odebrat z kanálu" aria-label="Odebrat z kanálu"
                       onClick={() => setConfirm({
                         title: `Odebrat ${displayName(u)} z kanálu?`,
                         description: channel.visibility === "private" ? "Přestane kanál vidět." : "Může se kdykoli znovu připojit.",
