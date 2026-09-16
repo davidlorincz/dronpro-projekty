@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalMutation } from "./_generated/server";
+import { internalAction, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { roleValidator } from "./schema";
 import { foldText } from "./lib";
@@ -135,5 +135,38 @@ export const backfillChat = internalMutation({
       if (c.memberCount !== members.length) await ctx.db.patch(c._id, { memberCount: members.length });
     }
     return `hotovo, poslední dávka: ${fixed}`;
+  },
+});
+
+/**
+ * Nahraje vlastní emoji z base64 (jednorázový seed z CLI, kde není přihlášení):
+ * `npx convex run maintenance:addChatEmoji '{"name":"drak","contentType":"image/png","base64":"…"}' --prod`
+ * Autorem je první admin. V appce se emoji přidávají přes picker.
+ */
+export const addChatEmoji = internalAction({
+  args: { name: v.string(), base64: v.string(), contentType: v.string() },
+  handler: async (ctx, args): Promise<string> => {
+    const bytes = Uint8Array.from(atob(args.base64), (c) => c.charCodeAt(0));
+    const storageId = await ctx.storage.store(new Blob([bytes], { type: args.contentType }));
+    return await ctx.runMutation(internal.maintenance.linkChatEmoji, { name: args.name, storageId });
+  },
+});
+
+export const linkChatEmoji = internalMutation({
+  args: { name: v.string(), storageId: v.id("_storage") },
+  handler: async (ctx, args) => {
+    const name = args.name.trim().toLowerCase();
+    const existing = await ctx.db.query("chatEmoji").withIndex("by_name", (q) => q.eq("name", name)).first();
+    if (existing) {
+      await ctx.storage.delete(args.storageId);
+      return `emoji :${name}: už existuje`;
+    }
+    const admin = await ctx.db.query("users").withIndex("by_role", (q) => q.eq("role", "admin")).first();
+    if (!admin) {
+      await ctx.storage.delete(args.storageId);
+      return "žádný admin, emoji nezaloženo";
+    }
+    await ctx.db.insert("chatEmoji", { name, storageId: args.storageId, createdBy: admin._id, createdAt: Date.now() });
+    return `emoji :${name}: přidáno`;
   },
 });
