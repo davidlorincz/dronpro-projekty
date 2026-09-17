@@ -55,6 +55,7 @@ export const list = query({
   },
 });
 
+/** `urgent` = zmínky, DM a odpovědi (červené číslo), `other` = reakce a přidání do kanálu (tečka). */
 export const unreadCount = query({
   args: {},
   handler: async (ctx) => {
@@ -63,7 +64,8 @@ export const unreadCount = query({
       .query("chatActivity")
       .withIndex("by_user_unread", (q) => q.eq("userId", me._id).eq("readAt", undefined))
       .take(100);
-    return rows.length;
+    const urgent = rows.filter((r) => r.kind === "mention" || r.kind === "dm" || r.kind === "reply").length;
+    return { urgent, other: rows.length - urgent };
   },
 });
 

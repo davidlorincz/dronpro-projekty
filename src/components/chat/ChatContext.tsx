@@ -20,7 +20,7 @@ type ChatCtx = {
   channelMap: Map<string, SidebarChannel>;
   userName: (id: Id<"users"> | string) => string;
   savedIds: Set<string>;
-  activityUnread: number;
+  activityUnread: { urgent: number; other: number };
   /** Vlastní emoji `name → url`. */
   emojiMap: Map<string, string>;
   customEmoji: { _id: Id<"chatEmoji">; name: string; url: string | null; createdBy: Id<"users"> }[];
@@ -40,6 +40,8 @@ type ChatCtx = {
 };
 
 export type ComposerApi = { insert: (text: string) => void; mention: (label: string, id: string) => void };
+
+const NO_ACTIVITY = { urgent: 0, other: 0 };
 
 const Ctx = createContext<ChatCtx | null>(null);
 
@@ -93,7 +95,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       channelMap,
       userName,
       savedIds: new Set((saved ?? []).map(String)),
-      activityUnread: activityUnread ?? 0,
+      activityUnread: activityUnread ?? NO_ACTIVITY,
       emojiMap: new Map((emoji ?? []).filter((e) => e.url).map((e) => [e.name, e.url!])),
       customEmoji: emoji ?? [],
       reminderByMessage: new Map((reminders ?? []).map((r) => [r.messageId as string, { _id: r._id, remindAt: r.remindAt }])),

@@ -8,6 +8,7 @@ import { AtSign, BellOff, Bookmark, ChevronDown, Compass, Hash, MessagesSquare, 
 import { cn } from "@/lib/utils";
 import { useChat, type SidebarChannel } from "./ChatContext";
 import { ChannelIcon } from "./ChannelIcon";
+import { UnreadMark } from "./UnreadMark";
 import { BrowseChannelsDialog, CreateChannelDialog, NewMessageDialog } from "./ChatDialogs";
 import { PresenceAvatar } from "./PresenceAvatar";
 import { useCoarsePointer } from "./usePointer";
@@ -75,6 +76,10 @@ export function ChatSidebar() {
   const { starred, regular, dms, custom } = orderSidebar(visible);
   const sectionNames = [...new Set(all.map((c) => c.section).filter((x): x is string => !!x))].sort((a, b) => a.localeCompare(b, "cs"));
   const hasUnread = all.some((c) => c.unread || c.mentionCount > 0);
+  // Sbalená sekce dál ukazuje nepřečtené a otevřenou konverzaci — jako Slack.
+  const rows = (items: SidebarChannel[], isCollapsed: boolean) => items
+    .filter((c) => !isCollapsed || isNoteworthy(c) || pathname === `/chat/${c._id}`)
+    .map((c) => <ChannelRow key={c._id} c={c} active={pathname === `/chat/${c._id}`} sections={sectionNames} />);
 
   return (
     <div className="flex h-full flex-col">
@@ -112,8 +117,8 @@ export function ChatSidebar() {
 
       <nav className="min-h-0 flex-1 overflow-y-auto px-2 py-3">
         <div className="mb-3 space-y-0.5">
-          <NavRow href="/chat/aktivita" active={pathname === "/chat/aktivita"} icon={Bell} label="Aktivita" unread={activityUnread > 0} badge={activityUnread} />
-          <NavRow href="/chat/vlakna" active={pathname === "/chat/vlakna"} icon={MessagesSquare} label="Vlákna" unread={!!sidebar?.unreadThreads} badge={sidebar?.unreadThreads} />
+          <NavRow href="/chat/aktivita" active={pathname === "/chat/aktivita"} icon={Bell} label="Aktivita" unread={activityUnread.urgent + activityUnread.other > 0} badge={activityUnread.urgent} />
+          <NavRow href="/chat/vlakna" active={pathname === "/chat/vlakna"} icon={MessagesSquare} label="Vlákna" unread={!!sidebar?.unreadThreads} />
           <NavRow href="/chat/hledat" active={pathname === "/chat/hledat"} icon={Search} label="Hledat" />
           <NavRow href="/chat/zminky" active={pathname === "/chat/zminky"} icon={AtSign} label="Zmínky" />
           <NavRow href="/chat/ulozene" active={pathname === "/chat/ulozene"} icon={Bookmark} label="Uložené" />
@@ -129,19 +134,19 @@ export function ChatSidebar() {
         ) : (
           <>
             {starred.length > 0 && (
-              <Section title="Oblíbené" aria-label="Oblíbené" collapsed={!!collapsed.starred} onToggle={() => toggle("starred")}>
-                {starred.map((c) => <ChannelRow key={c._id} c={c} active={pathname === `/chat/${c._id}`} sections={sectionNames} />)}
+              <Section title="Oblíbené" aria-label="Oblíbené" collapsed={!!collapsed.starred} onToggle={() => toggle("starred")} items={starred}>
+                {rows(starred, !!collapsed.starred)}
               </Section>
             )}
 
             {custom.map((sec) => (
-              <Section key={sec.title} title={sec.title} collapsed={!!collapsed[`s:${sec.title}`]} onToggle={() => toggle(`s:${sec.title}`)}>
-                {sec.items.map((c) => <ChannelRow key={c._id} c={c} active={pathname === `/chat/${c._id}`} sections={sectionNames} />)}
+              <Section key={sec.title} title={sec.title} collapsed={!!collapsed[`s:${sec.title}`]} onToggle={() => toggle(`s:${sec.title}`)} items={sec.items}>
+                {rows(sec.items, !!collapsed[`s:${sec.title}`])}
               </Section>
             ))}
 
             <Section
-              title="Kanály" aria-label="Kanály" collapsed={!!collapsed.channels} onToggle={() => toggle("channels")}
+              title="Kanály" aria-label="Kanály" collapsed={!!collapsed.channels} onToggle={() => toggle("channels")} items={regular}
               action={
                 <Popover.Root open={addOpen} onOpenChange={setAddOpen}>
                   <Popover.Trigger asChild>
@@ -162,22 +167,22 @@ export function ChatSidebar() {
                 </Popover.Root>
               }
             >
-              {regular.map((c) => <ChannelRow key={c._id} c={c} active={pathname === `/chat/${c._id}`} sections={sectionNames} />)}
-              <button type="button" onClick={() => setDialog("browse")} className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-sm text-a-text-4 hover:bg-a-hover hover:text-a-text cursor-pointer">
+              {rows(regular, !!collapsed.channels)}
+              {!collapsed.channels && <button type="button" onClick={() => setDialog("browse")} className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-sm text-a-text-4 hover:bg-a-hover hover:text-a-text cursor-pointer">
                 <Compass className="h-4 w-4" /> Procházet kanály
-              </button>
+              </button>}
             </Section>
 
             <Section
-              title="Přímé zprávy" aria-label="Přímé zprávy" collapsed={!!collapsed.dms} onToggle={() => toggle("dms")}
+              title="Přímé zprávy" aria-label="Přímé zprávy" collapsed={!!collapsed.dms} onToggle={() => toggle("dms")} items={dms}
               action={
                 <button type="button" onClick={() => setDialog("dm")} className="rounded p-0.5 text-a-text-4 hover:bg-a-elevated hover:text-a-text cursor-pointer" title="Nová zpráva" aria-label="Nová zpráva">
                   <Plus className="h-3.5 w-3.5" />
                 </button>
               }
             >
-              {dms.map((c) => <ChannelRow key={c._id} c={c} active={pathname === `/chat/${c._id}`} sections={sectionNames} />)}
-              {dms.length === 0 && (
+              {rows(dms, !!collapsed.dms)}
+              {dms.length === 0 && !collapsed.dms && (
                 <button type="button" onClick={() => setDialog("dm")} className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-sm text-a-text-4 hover:bg-a-hover hover:text-a-text cursor-pointer">
                   <SquarePen className="h-4 w-4" /> Napsat kolegovi
                 </button>
@@ -202,22 +207,31 @@ export function ChatSidebar() {
   );
 }
 
-function Section({ title, collapsed, onToggle, action, children }: {
-  title: string; collapsed: boolean; onToggle: () => void; action?: React.ReactNode; children: React.ReactNode;
+/** Konverzace, kterou má smysl ukázat i ve sbalené sekci. */
+function isNoteworthy(c: SidebarChannel) {
+  return c.mentionCount > 0 || (c.unread && !c.muted);
+}
+
+function Section({ title, collapsed, onToggle, action, items, children }: {
+  title: string; collapsed: boolean; onToggle: () => void; action?: React.ReactNode; items?: SidebarChannel[]; children: React.ReactNode;
 }) {
+  const mentions = items?.reduce((sum, c) => sum + c.mentionCount, 0) ?? 0;
+  const unread = !!items?.some((c) => c.unread && !c.muted);
   return (
     <div className="mb-3">
       <div className="group flex items-center justify-between px-1">
         <button type="button" onClick={onToggle} aria-expanded={!collapsed} className="flex items-center gap-1 py-1 text-xs font-semibold text-a-text-3 hover:text-a-text cursor-pointer">
           <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", collapsed && "-rotate-90")} /> {title}
+          {collapsed && <UnreadMark count={mentions} dot={unread} className="ml-1" />}
         </button>
         {action}
       </div>
-      {!collapsed && <div className="space-y-0.5">{children}</div>}
+      <div className="space-y-0.5">{children}</div>
     </div>
   );
 }
 
+/** `unread` = tučně + tečka, `badge` = červené číslo (má přednost). */
 function NavRow({ href, active, icon: Icon, label, unread, badge }: {
   href: string; active: boolean; icon: typeof Hash; label: string; unread?: boolean; badge?: number;
 }) {
@@ -228,7 +242,7 @@ function NavRow({ href, active, icon: Icon, label, unread, badge }: {
     )}>
       <Icon className="h-4 w-4 shrink-0" />
       <span className="flex-1 truncate">{label}</span>
-      {!!badge && <span className="rounded-full bg-red-500 px-1.5 text-[10px] font-bold leading-4 text-white">{badge}</span>}
+      <UnreadMark count={badge} dot={unread && !active} />
     </Link>
   );
 }
@@ -273,11 +287,7 @@ function ChannelRow({ c, active, sections }: { c: SidebarChannel; active: boolea
         )}
         <span className="flex-1 truncate">{title}</span>
         {c.muted && <BellOff className="h-3 w-3 shrink-0 opacity-60" aria-label="ztlumeno" />}
-        {c.mentionCount > 0 && (
-          <span className="rounded-full bg-red-500 px-1.5 text-[10px] font-bold leading-4 text-white" aria-label={`${c.mentionCount} nepřečtených zmínek`}>
-            {c.mentionCount}
-          </span>
-        )}
+        <UnreadMark count={c.mentionCount} dot={unread && !active} />
       </Link>
 
       <Popover.Root open={menuOpen} onOpenChange={setMenuOpen}>

@@ -9,6 +9,7 @@ import { useMe } from "./AuthGuard";
 import { ROLE_LABEL } from "@/lib/constants";
 import { UserAvatar } from "@/components/shared/UserAvatar";
 import { StatusMenu } from "@/components/chat/StatusMenu";
+import { ChatUnreadMark } from "@/components/chat/UnreadMark";
 import { cn } from "@/lib/utils";
 
 export function Header({ isDark, onToggleTheme, sidebarCollapsed, onToggleSidebar }: {
@@ -27,9 +28,11 @@ export function Header({ isDark, onToggleTheme, sidebarCollapsed, onToggleSideba
         {/* Na mobilu vždy (otevírá vysouvací menu), na desktopu jen při zasunutém menu. */}
         <button
           type="button" onClick={onToggleSidebar} title="Zobrazit menu (⌘\)"
-          className={cn("-ml-1.5 rounded-lg p-1.5 text-a-text-3 hover:bg-a-hover hover:text-a-text cursor-pointer", !sidebarCollapsed && "md:hidden")}
+          className={cn("relative -ml-1.5 rounded-lg p-1.5 text-a-text-3 hover:bg-a-hover hover:text-a-text cursor-pointer", !sidebarCollapsed && "md:hidden")}
         >
           <PanelLeftOpen className="h-5 w-5" />
+          {/* Menu je schované — nové zprávy v chatu musí být vidět i tak. */}
+          <ChatUnreadMark className="absolute -right-1 -top-1 ring-2 ring-a-surface" />
         </button>
         <span className="text-xs font-semibold uppercase tracking-widest text-a-text-4 hidden sm:inline">DRONPRO · Řízení projektů</span>
       </div>

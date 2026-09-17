@@ -49,7 +49,7 @@ function setIcon(href: string) {
 
 /** Počet nepřečtených zmínek a DM v titulku stránky i ve faviconě. */
 export function useUnreadBadge() {
-  const count = useQuery(api.chat.unreadBadge) ?? 0;
+  const count = useQuery(api.chat.unreadBadge)?.mentions ?? 0;
 
   useEffect(() => {
     const base = document.title.replace(/^\(\d+\+?\)\s*/, "");

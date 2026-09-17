@@ -7,8 +7,7 @@ import { PanelLeftClose, MessagesSquare, LayoutDashboard, FolderKanban, GanttCha
 import { cn } from "@/lib/utils";
 import { DronProLogo } from "@/components/shared/DronProLogo";
 import { useMe } from "./AuthGuard";
-import { useQuery } from "convex/react";
-import { api } from "../../../convex/_generated/api";
+import { ChatUnreadMark } from "@/components/chat/UnreadMark";
 
 type NavItem = { label: string; href: string; icon: typeof LayoutDashboard; adminOnly?: boolean; exact?: boolean; badge?: "chat" };
 
@@ -91,7 +90,6 @@ export function Sidebar({ collapsed, mobileOpen, onToggle, onCloseMobile }: {
 function SidebarContent({ onToggle, onNavigate }: { onToggle: () => void; onNavigate?: () => void }) {
   const pathname = usePathname();
   const { isAdmin } = useMe();
-  const chatBadge = useQuery(api.chat.unreadBadge);
 
   return (
     <>
@@ -130,9 +128,7 @@ function SidebarContent({ onToggle, onNavigate }: { onToggle: () => void; onNavi
                   >
                     <item.icon className="h-5 w-5" />
                     <span className="flex-1">{item.label}</span>
-                    {item.badge === "chat" && !!chatBadge && (
-                      <span className="rounded-full bg-red-500 px-1.5 text-[10px] font-bold leading-4 text-white">{chatBadge > 99 ? "99+" : chatBadge}</span>
-                    )}
+                    {item.badge === "chat" && <ChatUnreadMark />}
                   </Link>
                 );
               })}

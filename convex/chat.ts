@@ -198,14 +198,27 @@ export const mySidebar = query({
   },
 });
 
-/** Badge u položky Chat v hlavní navigaci: zmínky + nepřečtené DM. */
+/**
+ * Indikátor u položky Chat v hlavní navigaci. `mentions` = zmínky + zprávy v DM
+ * (červené číslo), `unread` = nějaký neztlumený kanál má nové zprávy (tečka).
+ * Kanály se čtou jen dokud tečka není jistá a jen u členství bez zmínek.
+ */
 export const unreadBadge = query({
   args: {},
   handler: async (ctx) => {
     const me = await getCurrentUser(ctx);
-    if (!me || me.status !== "active") return 0;
+    if (!me || me.status !== "active") return { mentions: 0, unread: false };
     const memberships = await ctx.db.query("chatMembers").withIndex("by_user", (q) => q.eq("userId", me._id)).collect();
-    return memberships.reduce((sum, m) => sum + m.mentionCount, 0);
+    const mentions = memberships.reduce((sum, m) => sum + m.mentionCount, 0);
+    let unread = false;
+    if (!mentions) {
+      for (const m of memberships) {
+        if (m.muted) continue;
+        const c = await ctx.db.get(m.channelId);
+        if (c && !c.archivedAt && !c.deletingAt && c.lastMessageAt > m.lastReadAt) { unread = true; break; }
+      }
+    }
+    return { mentions, unread };
   },
 });
 
