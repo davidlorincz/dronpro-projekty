@@ -14,6 +14,7 @@ import { errorToast } from "@/lib/convexError";
 import { areaCls } from "@/lib/compose";
 import { cn } from "@/lib/utils";
 import { fold } from "./tokens";
+import { ChannelIcon, ChannelIconPicker } from "./ChannelIcon";
 
 const inputCls = "w-full rounded-lg border border-a-border bg-a-input px-3 py-2 text-sm text-a-text outline-none focus:border-cyan-500 placeholder:text-a-text-4";
 
@@ -28,19 +29,20 @@ export function CreateChannelDialog({ open, onClose }: { open: boolean; onClose:
   const { isRestricted } = useMe();
   const create = useMutation(api.chat.create);
   const [name, setName] = useState("");
+  const [icon, setIcon] = useState<string | null>(null);
   const [description, setDescription] = useState("");
   const [visibility, setVisibility] = useState<"public" | "private">(isRestricted ? "private" : "public");
   const [memberIds, setMemberIds] = useState<Id<"users">[]>([]);
   const [saving, setSaving] = useState(false);
   const slug = previewSlug(name);
 
-  const reset = () => { setName(""); setDescription(""); setMemberIds([]); setVisibility(isRestricted ? "private" : "public"); };
+  const reset = () => { setName(""); setIcon(null); setDescription(""); setMemberIds([]); setVisibility(isRestricted ? "private" : "public"); };
 
   const submit = async () => {
     if (!slug || saving) return;
     setSaving(true);
     try {
-      const id = await create({ name, description: description || undefined, visibility, memberIds });
+      const id = await create({ name, icon: icon ?? undefined, description: description || undefined, visibility, memberIds });
       reset();
       onClose();
       router.push(`/chat/${id}`);
@@ -57,11 +59,15 @@ export function CreateChannelDialog({ open, onClose }: { open: boolean; onClose:
         <div className="space-y-4">
           <div>
             <label className="mb-1 block text-sm font-medium text-a-text-2">Název</label>
-            <div className="relative">
-              <Hash className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-a-text-4" />
-              <input autoFocus value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void submit(); }}
-                placeholder="např. eventy-2026" className={cn(inputCls, "pl-9")} />
+            <div className="flex items-center gap-2">
+              <ChannelIconPicker icon={icon ?? undefined} visibility={visibility} onChange={setIcon} />
+              <div className="relative flex-1">
+                <Hash className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-a-text-4" />
+                <input autoFocus value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void submit(); }}
+                  placeholder="např. eventy-2026" className={cn(inputCls, "pl-9")} />
+              </div>
             </div>
+            <div className="mt-1 text-xs text-a-text-4">Ikona z palety emoji pomůže kanál rychle najít v panelu.</div>
             {name && slug !== name && <div className="mt-1 text-xs text-a-text-4">Kanál se bude jmenovat <span className="font-medium text-a-text-2">#{slug || "…"}</span></div>}
           </div>
           <div>
@@ -145,7 +151,7 @@ export function BrowseChannelsDialog({ open, onClose, onCreate }: { open: boolea
             <div key={c._id} className="group flex items-center gap-3 rounded-xl px-2 py-2.5 hover:bg-a-hover">
               <button type="button" onClick={() => go(c._id)} className="min-w-0 flex-1 text-left cursor-pointer">
                 <div className="flex items-center gap-1 text-sm font-semibold text-a-text">
-                  {c.visibility === "private" ? <Lock className="h-3.5 w-3.5" /> : <Hash className="h-3.5 w-3.5" />} {c.name}
+                  <ChannelIcon icon={c.icon} visibility={c.visibility} /> {c.name}
                 </div>
                 <div className="truncate text-xs text-a-text-3">
                   {c.isMember && <span className="font-medium text-a-text-success"><Check className="-mt-0.5 inline h-3 w-3" /> Jsi členem · </span>}

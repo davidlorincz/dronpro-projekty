@@ -7,7 +7,8 @@ import { useMutation, useQuery } from "convex/react";
 import * as Popover from "@radix-ui/react-popover";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { ArrowLeft, Bell, BellOff, Check, Hash, Info, Loader2, Lock, Paperclip, Pin, Search, Star, Upload, Clock } from "lucide-react";
+import { ArrowLeft, Bell, BellOff, Check, Info, Loader2, Lock, Paperclip, Pin, Search, Star, Upload, Clock } from "lucide-react";
+import { ChannelIcon } from "./ChannelIcon";
 import { UserAvatars } from "@/components/shared/UserAvatar";
 import { errorToast } from "@/lib/convexError";
 import { formatDateTime } from "@/lib/dates";
@@ -148,7 +149,7 @@ function ChannelInner({ channel }: { channel: ChannelDetail }) {
           <Link href="/chat" className="rounded-lg p-1.5 text-a-text-3 hover:bg-a-hover md:hidden" title="Zpět" aria-label="Zpět"><ArrowLeft className="h-4 w-4" /></Link>
           <button type="button" onClick={() => setParam("detail", "about")} className="flex min-w-0 items-center gap-1.5 rounded-lg px-1.5 py-1 hover:bg-a-hover cursor-pointer">
             {channel.kind === "channel" ? (
-              channel.visibility === "private" ? <Lock className="h-4 w-4 shrink-0 text-a-text-3" /> : <Hash className="h-4 w-4 shrink-0 text-a-text-3" />
+              <ChannelIcon icon={channel.icon} visibility={channel.visibility} size="md" className="text-a-text-3" />
             ) : dmUserIds.length === 1 && userMap.get(dmUserIds[0]) ? (
               <PresenceAvatar user={userMap.get(dmUserIds[0])!} size="sm" />
             ) : null}

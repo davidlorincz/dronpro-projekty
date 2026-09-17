@@ -16,6 +16,7 @@ import { formatDateTime } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 import { displayName, useChat, type ChannelDetail } from "./ChatContext";
 import { PresenceAvatar } from "./PresenceAvatar";
+import { ChannelIcon, ChannelIconPicker } from "./ChannelIcon";
 
 type Confirm = { title: string; description: string; label: string; destructive?: boolean; run: () => Promise<void> };
 
@@ -92,7 +93,8 @@ export function ChannelDetailsPanel({ channel, title, tab, onTab, onClose }: {
   return (
     <div className="flex h-full flex-col bg-a-surface">
       <div className="flex h-14 shrink-0 items-center gap-2 border-b border-a-border px-4">
-        <div className="min-w-0 truncate font-semibold text-a-text">{isChannel ? `#${channel.name}` : title}</div>
+        {isChannel && <ChannelIcon icon={channel.icon} visibility={channel.visibility} className="text-a-text-3" />}
+        <div className="min-w-0 truncate font-semibold text-a-text">{isChannel ? channel.name : title}</div>
         <button type="button" onClick={onClose} className="ml-auto rounded-lg p-1.5 text-a-text-3 hover:bg-a-hover hover:text-a-text cursor-pointer" title="Zavřít (Esc)" aria-label="Zavřít (Esc)">
           <X className="h-4 w-4" />
         </button>
@@ -114,6 +116,20 @@ export function ChannelDetailsPanel({ channel, title, tab, onTab, onClose }: {
       <div className="min-h-0 flex-1 overflow-y-auto">
         {isChannel && tab === "about" ? (
           <>
+            <div className="flex items-center justify-between border-b border-a-border px-4 py-3">
+              <div>
+                <div className="text-xs font-semibold text-a-text-3">Ikona</div>
+                <div className="mt-0.5 text-xs text-a-text-4">{channel.icon ? "Zobrazuje se před názvem kanálu" : "Bez ikony"}</div>
+              </div>
+              {channel.canManage ? (
+                <ChannelIconPicker
+                  icon={channel.icon} visibility={channel.visibility}
+                  onChange={async (icon) => { try { await update({ channelId: channel._id, icon }); } catch (e) { errorToast(e); } }}
+                />
+              ) : (
+                <ChannelIcon icon={channel.icon} visibility={channel.visibility} size="md" className="text-a-text-3" />
+              )}
+            </div>
             {field("name", "Název", channel.name, "")}
             {field("topic", "Téma", channel.topic, "Bez tématu")}
             {field("description", "Popis", channel.description, "Bez popisu")}

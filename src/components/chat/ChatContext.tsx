@@ -43,6 +43,11 @@ export type ComposerApi = { insert: (text: string) => void; mention: (label: str
 
 const Ctx = createContext<ChatCtx | null>(null);
 
+/** Mimo `ChatProvider` (např. „Sdílet do chatu“ v detailu projektu) vrací `null`. */
+export function useChatOptional() {
+  return useContext(Ctx);
+}
+
 export function useChat() {
   const ctx = useContext(Ctx);
   if (!ctx) throw new Error("useChat mimo ChatProvider");

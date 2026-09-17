@@ -82,7 +82,7 @@ export const channelFor = query({
         ? await ctx.db.query("chatChannels").withIndex("by_event", (q) => q.eq("eventId", args.eventId)).first()
         : null;
     if (!channel || channel.deletingAt) return null;
-    return { _id: channel._id, name: channel.name ?? "", archivedAt: channel.archivedAt };
+    return { _id: channel._id, name: channel.name ?? "", icon: channel.icon, archivedAt: channel.archivedAt };
   },
 });
 

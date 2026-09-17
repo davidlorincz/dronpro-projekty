@@ -42,6 +42,18 @@ function cleanOptional(text: string | null | undefined, max: number, label: stri
   return t || undefined;
 }
 
+const CUSTOM_ICON_RE = /^:[a-z0-9_-]{2,32}:$/;
+const UNICODE_ICON_RE = /^(?:\p{Extended_Pictographic}|\p{Emoji_Modifier}|\p{Regional_Indicator}|[0-9#*\u200d\u20e3\ufe0f\u{e0020}-\u{e007f}])+$/u;
+const PICTO_RE = /\p{Extended_Pictographic}|\p{Regional_Indicator}|\u20e3/u;
+
+/** Ikona kanálu = jedno emoji z pickeru. `null`/prázdné = bez ikony. */
+function cleanIcon(raw: string | null | undefined) {
+  const icon = raw?.trim();
+  if (!icon) return undefined;
+  if (CUSTOM_ICON_RE.test(icon) || (icon.length <= 16 && UNICODE_ICON_RE.test(icon) && PICTO_RE.test(icon))) return icon;
+  throw new ConvexError("Ikona kanálu musí být jedno emoji.");
+}
+
 async function assertNameFree(ctx: MutationCtx, name: string, except?: Id<"chatChannels">) {
   const clash = await ctx.db.query("chatChannels").withIndex("by_name", (q) => q.eq("name", name)).first();
   if (clash && clash._id !== except) throw new ConvexError(`Kanál #${name} už existuje.`);
@@ -165,6 +177,7 @@ export const mySidebar = query({
         kind: c.kind,
         visibility: c.visibility,
         name: c.name,
+        icon: c.icon,
         topic: c.topic,
         isDefault: !!c.isDefault,
         lastMessageAt: c.lastMessageAt,
@@ -212,6 +225,7 @@ export const browse = query({
       out.push({
         _id: c._id,
         name: c.name ?? "",
+        icon: c.icon,
         topic: c.topic,
         description: c.description,
         visibility: c.visibility,
@@ -264,6 +278,7 @@ export const get = query({
 export const create = mutation({
   args: {
     name: v.string(),
+    icon: v.optional(v.string()),
     visibility: v.union(v.literal("public"), v.literal("private")),
     description: v.optional(v.string()),
     memberIds: v.array(v.id("users")),
@@ -280,6 +295,7 @@ export const create = mutation({
       kind: "channel",
       visibility: args.visibility,
       name,
+      icon: cleanIcon(args.icon),
       description: cleanOptional(args.description, MAX_DESCRIPTION, "Popis"),
       lastMessageAt: now,
       createdBy: me._id,
@@ -396,6 +412,7 @@ export const update = mutation({
   args: {
     channelId: v.id("chatChannels"),
     name: v.optional(v.string()),
+    icon: v.optional(v.union(v.string(), v.null())), // null = bez ikony
     topic: v.optional(v.union(v.string(), v.null())), // null = vymazat
     description: v.optional(v.union(v.string(), v.null())),
   },
@@ -411,6 +428,7 @@ export const update = mutation({
         await insertSystemMessage(ctx, channel._id, me._id, `<@${me._id}> přejmenoval(a) kanál na #${name}`);
       }
     }
+    if (args.icon !== undefined) patch.icon = cleanIcon(args.icon);
     if (args.topic !== undefined) {
       patch.topic = cleanOptional(args.topic, MAX_TOPIC, "Téma");
       if (patch.topic !== channel.topic) {

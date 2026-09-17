@@ -390,6 +390,8 @@ export default defineSchema({
     name: v.optional(v.string()), // slug, unikátní; jen kanály
     topic: v.optional(v.string()),
     description: v.optional(v.string()),
+    /** Emoji před názvem kanálu (unicode nebo vlastní `:nazev:`) — jen kvůli orientaci v panelu. */
+    icon: v.optional(v.string()),
     /** Seřazená userIds spojená `_` — stejná skupina lidí má jen jedno DM. */
     dmKey: v.optional(v.string()),
     /** `#obecne` — automatické členství, nejde opustit ani archivovat. */

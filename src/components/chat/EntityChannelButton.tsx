@@ -7,6 +7,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { Hash, Loader2, MessagesSquare } from "lucide-react";
+import { ChannelIcon } from "./ChannelIcon";
 import { errorToast } from "@/lib/convexError";
 import { cn } from "@/lib/utils";
 
@@ -32,7 +33,7 @@ export function EntityChannelButton({ projectId, eventId, canCreate, className }
   if (channel) {
     return (
       <Link href={`/chat/${channel._id}`} className={cn(base, "text-a-text-3 hover:bg-a-hover hover:text-a-text", className)}>
-        <Hash className="h-4 w-4" /> {channel.name}
+        {channel.icon ? <ChannelIcon icon={channel.icon} visibility="public" /> : <Hash className="h-4 w-4" />} {channel.name}
       </Link>
     );
   }

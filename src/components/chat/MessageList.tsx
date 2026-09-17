@@ -4,10 +4,11 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { usePaginatedQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { ArrowDown, Hash, Loader2, Lock } from "lucide-react";
+import { ArrowDown, Loader2 } from "lucide-react";
 import { formatDateTime } from "@/lib/dates";
 import { useChat, type ChannelDetail, type ChatMessage } from "./ChatContext";
 import { MessageItem } from "./MessageItem";
+import { ChannelIcon } from "./ChannelIcon";
 
 const GROUP_MS = 5 * 60 * 1000;
 const PAGE = 50;
@@ -237,7 +238,7 @@ function ChannelIntro({ channel, title }: { channel: ChannelDetail; title: strin
       {channel.kind === "channel" ? (
         <>
           <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-a-accent-bg text-a-accent-text">
-            {channel.visibility === "private" ? <Lock className="h-6 w-6" /> : <Hash className="h-6 w-6" />}
+            <ChannelIcon icon={channel.icon} visibility={channel.visibility} size="lg" />
           </div>
           <div className="text-xl font-bold text-a-text">#{channel.name}</div>
           <p className="mt-1 text-sm text-a-text-3">

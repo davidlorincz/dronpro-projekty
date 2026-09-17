@@ -4,9 +4,10 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import * as Popover from "@radix-ui/react-popover";
-import { AtSign, BellOff, Bookmark, ChevronDown, Compass, Hash, Lock, MessagesSquare, Plus, Search, SquarePen, Star, Clock, CheckCheck, Filter, Keyboard, Bell, FolderPlus, MoreHorizontal, BellOff as BellOffIcon } from "lucide-react";
+import { AtSign, BellOff, Bookmark, ChevronDown, Compass, Hash, MessagesSquare, Plus, Search, SquarePen, Star, Clock, CheckCheck, Filter, Keyboard, Bell, FolderPlus, MoreHorizontal, BellOff as BellOffIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useChat, type SidebarChannel } from "./ChatContext";
+import { ChannelIcon } from "./ChannelIcon";
 import { BrowseChannelsDialog, CreateChannelDialog, NewMessageDialog } from "./ChatDialogs";
 import { PresenceAvatar } from "./PresenceAvatar";
 import { useCoarsePointer } from "./usePointer";
@@ -262,7 +263,7 @@ function ChannelRow({ c, active, sections }: { c: SidebarChannel; active: boolea
         )}
       >
         {c.kind === "channel" ? (
-          c.visibility === "private" ? <Lock className="h-3.5 w-3.5 shrink-0 opacity-70" /> : <Hash className="h-4 w-4 shrink-0 opacity-70" />
+          <ChannelIcon icon={c.icon} visibility={c.visibility} className={c.icon ? undefined : "opacity-70"} />
         ) : c.dmUserIds.length > 1 ? (
           <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-a-elevated text-[10px] font-bold text-a-text-3">{c.dmUserIds.length}</span>
         ) : first ? (

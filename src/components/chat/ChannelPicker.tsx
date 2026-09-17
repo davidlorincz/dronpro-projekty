@@ -4,10 +4,11 @@ import { useMemo, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { Check, Hash, Loader2, Lock, Search, Users } from "lucide-react";
+import { Check, Loader2, Search, Users } from "lucide-react";
 import { UserAvatar } from "@/components/shared/UserAvatar";
 import { cn } from "@/lib/utils";
 import { fold } from "./tokens";
+import { ChannelIcon } from "./ChannelIcon";
 
 /** Výběr kanálu nebo konverzace — sdílí ho „Sdílet do chatu“ i přeposlání zprávy. */
 export function ChannelPicker({ value, onChange }: { value: Id<"chatChannels"> | null; onChange: (id: Id<"chatChannels">) => void }) {
@@ -48,7 +49,7 @@ export function ChannelPicker({ value, onChange }: { value: Id<"chatChannels"> |
             className={cn("flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm cursor-pointer", value === c._id ? "bg-a-accent-bg text-a-accent-text" : "text-a-text-2 hover:bg-a-hover")}
           >
             {c.kind === "channel"
-              ? c.visibility === "private" ? <Lock className="h-4 w-4 shrink-0" /> : <Hash className="h-4 w-4 shrink-0" />
+              ? <ChannelIcon icon={c.icon} visibility={c.visibility} />
               : c.others.length === 1 ? <UserAvatar user={c.others[0]} size="xs" /> : <Users className="h-4 w-4 shrink-0" />}
             <span className="flex-1 truncate">{c.title}</span>
             {value === c._id && <Check className="h-4 w-4" />}
